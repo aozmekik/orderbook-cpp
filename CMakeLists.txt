@@ -28,6 +28,8 @@ include(Warnings)
 
 add_library(
   orderbook
+  src/csv.cpp
+  src/format.cpp
   src/types.cpp)
 add_library(orderbook::orderbook ALIAS orderbook)
 

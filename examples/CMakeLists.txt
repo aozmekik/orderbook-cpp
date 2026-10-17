@@ -1,0 +1,11 @@
+foreach(example IN ITEMS basic market_data)
+  add_executable(example_${example} ${example}.cpp)
+  target_link_libraries(example_${example} PRIVATE orderbook::orderbook)
+  ob_enable_warnings(example_${example})
+endforeach()
+
+if(OB_BUILD_TESTS)
+  add_test(NAME example.basic COMMAND example_basic)
+  set_tests_properties(example.basic PROPERTIES PASS_REGULAR_EXPRESSION "best bid: 10040 x 200")
+  add_test(NAME example.market_data COMMAND example_market_data)
+endif()

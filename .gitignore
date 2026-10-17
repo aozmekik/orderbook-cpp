@@ -1,0 +1,41 @@
+# Build trees (CMake presets put everything under build/)
+/build/
+/out/
+cmake-build-*/
+CMakeUserPresets.json
+compile_commands.json
+
+# Local tooling environments
+/.venv/
+__pycache__/
+*.pyc
+
+# Fuzzing output
+/fuzz/corpus-work/
+crash-*
+leak-*
+timeout-*
+oom-*
+slow-unit-*
+*.profraw
+*.profdata
+
+# Coverage output
+/coverage/
+*.gcda
+*.gcno
+*.gcov
+
+# Benchmark scratch output
+/bench/results/*.json
+
+# Editors and OS
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+.cache/
+
+# Golden-test failures
+*.actual

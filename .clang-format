@@ -1,0 +1,23 @@
+---
+Language: Cpp
+BasedOnStyle: Google
+ColumnLimit: 100
+Standard: c++20
+DerivePointerAlignment: false
+PointerAlignment: Left
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^<orderbook/'
+    Priority: 3
+  - Regex: '^<(gtest|benchmark)/'
+    Priority: 2
+  - Regex: '^<.*\.h>'
+    Priority: 1
+  - Regex: '^<.*>'
+    Priority: 1
+  - Regex: '^".*"'
+    Priority: 4
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+...

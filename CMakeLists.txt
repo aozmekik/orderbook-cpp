@@ -30,7 +30,8 @@ add_library(
   orderbook
   src/csv.cpp
   src/format.cpp
-  src/types.cpp)
+  src/types.cpp
+  src/workload.cpp)
 add_library(orderbook::orderbook ALIAS orderbook)
 
 target_include_directories(

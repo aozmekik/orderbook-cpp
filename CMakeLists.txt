@@ -9,6 +9,7 @@ project(
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
+option(OB_BUILD_TESTS "Build the unit and differential tests" ${PROJECT_IS_TOP_LEVEL})
 option(OB_BUILD_APPS "Build the obreplay and obgen command-line tools" ${PROJECT_IS_TOP_LEVEL})
 option(OB_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ${PROJECT_IS_TOP_LEVEL})
 option(OB_INSTALL "Generate the install and package-config rules" ${PROJECT_IS_TOP_LEVEL})
@@ -42,10 +43,16 @@ target_compile_features(orderbook PUBLIC cxx_std_20)
 set_target_properties(orderbook PROPERTIES VERSION ${PROJECT_VERSION} EXPORT_NAME orderbook)
 ob_enable_warnings(orderbook)
 
-# --- Command-line tools ------------------------------------------------------
+# --- Command-line tools, tests -----------------------------------------------
 
 if(OB_BUILD_APPS)
   add_subdirectory(apps)
+endif()
+
+if(OB_BUILD_TESTS)
+  include(Dependencies)
+  enable_testing()
+  add_subdirectory(tests)
 endif()
 
 # --- Install and package config ----------------------------------------------

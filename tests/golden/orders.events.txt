@@ -1,0 +1,48 @@
+accepted AAPL id=1 owner=1 side=sell type=limit price=10060 qty=300
+delta AAPL ask price=10060 qty=300 orders=1
+accepted AAPL id=2 owner=2 side=sell type=limit price=10055 qty=200
+delta AAPL ask price=10055 qty=200 orders=1
+accepted AAPL id=3 owner=3 side=sell type=limit price=10055 qty=100
+delta AAPL ask price=10055 qty=300 orders=2
+accepted AAPL id=4 owner=4 side=buy type=limit price=10045 qty=400
+delta AAPL bid price=10045 qty=400 orders=1
+accepted AAPL id=5 owner=5 side=buy type=limit price=10040 qty=500
+delta AAPL bid price=10040 qty=500 orders=1
+accepted AAPL id=6 owner=6 side=buy type=limit price=10055 qty=350
+fill AAPL taker=6 maker=2 side=buy price=10055 qty=200 taker_left=150 maker_left=0
+fill AAPL taker=6 maker=3 side=buy price=10055 qty=100 taker_left=50 maker_left=0
+delta AAPL ask price=10055 qty=0 orders=0
+delta AAPL bid price=10055 qty=50 orders=1
+modified AAPL id=4 price=10045 qty=250 priority=kept
+delta AAPL bid price=10045 qty=250 orders=1
+modified AAPL id=5 price=10050 qty=500 priority=lost
+delta AAPL bid price=10040 qty=0 orders=0
+delta AAPL bid price=10050 qty=500 orders=1
+accepted AAPL id=7 owner=7 side=sell type=market price=0 qty=600
+fill AAPL taker=7 maker=6 side=sell price=10055 qty=50 taker_left=550 maker_left=0
+delta AAPL bid price=10055 qty=0 orders=0
+fill AAPL taker=7 maker=5 side=sell price=10050 qty=500 taker_left=50 maker_left=0
+delta AAPL bid price=10050 qty=0 orders=0
+fill AAPL taker=7 maker=4 side=sell price=10045 qty=50 taker_left=0 maker_left=200
+delta AAPL bid price=10045 qty=200 orders=1
+accepted AAPL id=8 owner=8 side=buy type=ioc price=10060 qty=400
+fill AAPL taker=8 maker=1 side=buy price=10060 qty=300 taker_left=100 maker_left=0
+delta AAPL ask price=10060 qty=0 orders=0
+cancelled AAPL id=8 qty=100 reason=ioc_remainder
+accepted AAPL id=9 owner=9 side=sell type=fok price=10040 qty=10000
+cancelled AAPL id=9 qty=10000 reason=fok_unfillable
+rejected AAPL id=10 request=new reason=post_only_would_cross
+accepted AAPL id=11 owner=1 side=sell type=post_only price=10065 qty=100
+delta AAPL ask price=10065 qty=100 orders=1
+accepted MSFT id=1 owner=1 side=buy type=limit price=41000 qty=50
+delta MSFT bid price=41000 qty=50 orders=1
+accepted MSFT id=2 owner=2 side=sell type=limit price=41010 qty=50
+delta MSFT ask price=41010 qty=50 orders=1
+cancelled AAPL id=11 qty=100 reason=requested
+delta AAPL ask price=10065 qty=0 orders=0
+rejected AAPL id=99 request=cancel reason=unknown_order
+snapshot AAPL bids=1 asks=0
+level AAPL bid price=10045 qty=200 orders=1
+snapshot MSFT bids=1 asks=1
+level MSFT ask price=41010 qty=50 orders=1
+level MSFT bid price=41000 qty=50 orders=1

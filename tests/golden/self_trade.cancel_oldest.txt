@@ -1,0 +1,15 @@
+accepted XYZ id=1 owner=1 side=sell type=limit price=500 qty=100
+delta XYZ ask price=500 qty=100 orders=1
+accepted XYZ id=2 owner=7 side=sell type=limit price=500 qty=100
+delta XYZ ask price=500 qty=200 orders=2
+accepted XYZ id=3 owner=1 side=sell type=limit price=501 qty=100
+delta XYZ ask price=501 qty=100 orders=1
+accepted XYZ id=4 owner=7 side=buy type=limit price=501 qty=250
+fill XYZ taker=4 maker=1 side=buy price=500 qty=100 taker_left=150 maker_left=0
+cancelled XYZ id=2 qty=100 reason=self_trade
+delta XYZ ask price=500 qty=0 orders=0
+fill XYZ taker=4 maker=3 side=buy price=501 qty=100 taker_left=50 maker_left=0
+delta XYZ ask price=501 qty=0 orders=0
+delta XYZ bid price=501 qty=50 orders=1
+snapshot XYZ bids=1 asks=0
+level XYZ bid price=501 qty=50 orders=1

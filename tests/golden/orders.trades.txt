@@ -1,0 +1,11 @@
+fill AAPL taker=6 maker=2 side=buy price=10055 qty=200 taker_left=150 maker_left=0
+fill AAPL taker=6 maker=3 side=buy price=10055 qty=100 taker_left=50 maker_left=0
+fill AAPL taker=7 maker=6 side=sell price=10055 qty=50 taker_left=550 maker_left=0
+fill AAPL taker=7 maker=5 side=sell price=10050 qty=500 taker_left=50 maker_left=0
+fill AAPL taker=7 maker=4 side=sell price=10045 qty=50 taker_left=0 maker_left=200
+fill AAPL taker=8 maker=1 side=buy price=10060 qty=300 taker_left=100 maker_left=0
+snapshot AAPL bids=1 asks=0
+level AAPL bid price=10045 qty=200 orders=1
+snapshot MSFT bids=1 asks=1
+level MSFT ask price=41010 qty=50 orders=1
+level MSFT bid price=41000 qty=50 orders=1

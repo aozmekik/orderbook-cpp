@@ -38,8 +38,9 @@ struct Option {
 template <class Int>
 [[nodiscard]] std::optional<Int> parse_number(std::string_view text) {
   Int value{};
-  const char* const last = text.data() + text.size();
-  const auto [end, error] = std::from_chars(text.data(), last, value);
+  const char* const first = text.data();
+  const char* const last = first + text.size();
+  const auto [end, error] = std::from_chars(first, last, value);
   if (text.empty() || error != std::errc{} || end != last) {
     return std::nullopt;
   }
@@ -60,10 +61,24 @@ template <class Int>
   return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
 }
 
+/// Writes `text` to `stream`. Errors are detected later with `finish`.
+inline void write(std::FILE* stream, std::string_view text) {
+  static_cast<void>(std::fwrite(text.data(), 1, text.size(), stream));
+}
+
 /// Writes `text` to standard output and clears it.
 inline void flush_to_stdout(std::string& text) {
-  std::fwrite(text.data(), 1, text.size(), stdout);
+  write(stdout, text);
   text.clear();
+}
+
+/// Flushes standard output; returns `status`, or 1 if any write failed.
+[[nodiscard]] inline int finish(int status) {
+  if (std::fflush(stdout) != 0 || std::ferror(stdout) != 0) {
+    write(stderr, "error: cannot write to standard output\n");
+    return 1;
+  }
+  return status;
 }
 
 }  // namespace ob::cli

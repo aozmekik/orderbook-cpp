@@ -60,8 +60,8 @@ struct CsvRecord {
   OrderId id{};                             ///< Order id.
   Side side = Side::buy;                    ///< Side (new orders).
   OrderType type = OrderType::limit;        ///< Type (new orders).
-  Price price{};                            ///< Price (new non-market orders, modify).
-  Qty qty{};                                ///< Quantity (new orders, modify).
+  Price price;                              ///< Price (new non-market orders, modify).
+  Qty qty;                                  ///< Quantity (new orders, modify).
   OwnerId owner{};                          ///< Owner (new orders).
 
   /// Field-wise equality (compares the symbol text).

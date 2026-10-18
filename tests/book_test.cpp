@@ -277,7 +277,7 @@ TYPED_TEST(BookTest, PostOnlyRestsWhenItDoesNotCross) {
   EXPECT_EQ(h.submit(test::order(2, kBuy, OrderType::post_only, 100, 5)),
             (Lines{"accepted X id=2 owner=0 side=buy type=post_only price=100 qty=5",
                    "delta X bid price=100 qty=5 orders=1"}));
-  EXPECT_EQ(h.book.find(OrderId{2})->type, OrderType::post_only);
+  EXPECT_EQ(test::live_order(h.book, 2).type, OrderType::post_only);
 }
 
 TYPED_TEST(BookTest, PostOnlyThatWouldTakeLiquidityIsRejected) {
@@ -383,7 +383,7 @@ TYPED_TEST(BookTest, ModifyToACrossingPriceMatches) {
       (Lines{"modified X id=2 price=101 qty=8 priority=lost", "delta X bid price=99 qty=0 orders=0",
              "fill X taker=2 maker=1 side=buy price=101 qty=5 taker_left=3 maker_left=0",
              "delta X ask price=101 qty=0 orders=0", "delta X bid price=101 qty=3 orders=1"}));
-  EXPECT_EQ(h.book.find(OrderId{2})->qty, Qty{3});
+  EXPECT_EQ(test::live_order(h.book, 2).qty, Qty{3});
 }
 
 TYPED_TEST(BookTest, ModifyThatFillsCompletelyRemovesTheOrder) {
@@ -401,11 +401,11 @@ TYPED_TEST(BookTest, PostOnlyModifyThatWouldCrossIsRejectedAndChangesNothing) {
   h.submit(test::order(2, kBuy, OrderType::post_only, 99, 5));
   EXPECT_EQ(h.modify(test::modify(2, 101, 5)),
             (Lines{"rejected X id=2 request=modify reason=post_only_would_cross"}));
-  EXPECT_EQ(h.book.find(OrderId{2})->price, Price{99});
+  EXPECT_EQ(test::live_order(h.book, 2).price, Price{99});
   EXPECT_EQ(h.modify(test::modify(2, 100, 5)),
             (Lines{"modified X id=2 price=100 qty=5 priority=lost",
                    "delta X bid price=99 qty=0 orders=0", "delta X bid price=100 qty=5 orders=1"}));
-  EXPECT_EQ(h.book.find(OrderId{2})->type, OrderType::post_only);
+  EXPECT_EQ(test::live_order(h.book, 2).type, OrderType::post_only);
 }
 
 TYPED_TEST(BookTest, ModifyValidatesBeforeLookingUpTheOrder) {
@@ -419,7 +419,7 @@ TYPED_TEST(BookTest, ModifyValidatesBeforeLookingUpTheOrder) {
             (Lines{"rejected X id=1 request=modify reason=invalid_price"}));
   EXPECT_EQ(h.modify(test::modify(1, 100, kMaxOrderQty.value() + 1)),
             (Lines{"rejected X id=1 request=modify reason=invalid_quantity"}));
-  EXPECT_EQ(h.book.find(OrderId{1})->qty, Qty{5});
+  EXPECT_EQ(test::live_order(h.book, 1).qty, Qty{5});
 }
 
 // --- Validation and limits ------------------------------------------------------

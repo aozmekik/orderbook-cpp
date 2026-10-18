@@ -90,10 +90,10 @@ template <class E>
 /// Smallest price a book accepts, in ticks. The range is symmetric and leaves
 /// headroom so that negating a price or offsetting it by a ladder window can
 /// never overflow. Negative prices are allowed (spreads, some futures).
-inline constexpr Price kMinPrice{-(std::int64_t{1} << 62)};
+inline constexpr Price kMinPrice{-4'611'686'018'427'387'904};  // -2^62
 
 /// Largest price a book accepts, in ticks.
-inline constexpr Price kMaxPrice{std::int64_t{1} << 62};
+inline constexpr Price kMaxPrice{4'611'686'018'427'387'904};  // 2^62
 
 /// Largest quantity of a single order. With fewer than 2^32 orders per book,
 /// any sum of open quantities fits in a signed 64-bit integer.

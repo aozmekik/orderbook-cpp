@@ -33,7 +33,7 @@ class MapLevels {
 
   /// The level stored for `key`; if there is none, stores and returns `make()`.
   template <class Make>
-  detail::Index find_or_insert(LevelKey key, Make&& make) {
+  detail::Index find_or_insert(LevelKey key, Make make) {
     const auto [it, inserted] = levels_.try_emplace(key, detail::kNil);
     if (inserted) {
       it->second = make();
@@ -61,7 +61,7 @@ class MapLevels {
   /// Calls `visit(key, level)` from the best level to the worst until it
   /// returns false.
   template <class Visit>
-  void for_each(Visit&& visit) const {
+  void for_each(Visit visit) const {
     for (const auto& [key, level] : levels_) {
       if (!visit(key, level)) {
         return;
@@ -76,7 +76,7 @@ class MapLevels {
   [[nodiscard]] bool empty() const noexcept { return levels_.empty(); }
 
   /// A `std::map` is consistent by construction; always `std::nullopt`.
-  [[nodiscard]] std::optional<std::string> check_invariants() const { return std::nullopt; }
+  [[nodiscard]] static std::optional<std::string> check_invariants() { return std::nullopt; }
 
  private:
   std::map<LevelKey, detail::Index> levels_;

@@ -69,7 +69,7 @@ class DistanceTable {
 
   [[nodiscard]] std::int64_t sample(Rng& rng) const {
     const std::uint64_t r = rng.below(cumulative_.back());
-    return std::upper_bound(cumulative_.begin(), cumulative_.end(), r) - cumulative_.begin();
+    return std::ranges::upper_bound(cumulative_, r) - cumulative_.begin();
   }
 
  private:
@@ -80,18 +80,18 @@ class DistanceTable {
 /// Event sink that keeps the live sets and statistics up to date.
 class Tracker {
  public:
-  Tracker(std::vector<LiveSet>& live, Stats& stats) noexcept : live_(live), stats_(stats) {}
+  Tracker(std::vector<LiveSet>& live, Stats& stats) noexcept : live_(&live), stats_(&stats) {}
 
   void operator()(const Fill& fill) {
-    ++stats_.fills;
+    ++stats_->fills;
     if (fill.maker_remaining == Qty{0} && set_of(fill.symbol).remove(fill.maker_id)) {
-      ++stats_.ended_filled;
+      ++stats_->ended_filled;
     }
   }
 
   void operator()(const Cancelled& cancelled) {
     if (set_of(cancelled.symbol).remove(cancelled.id)) {
-      ++stats_.ended_cancelled;
+      ++stats_->ended_cancelled;
     }
   }
 
@@ -100,11 +100,11 @@ class Tracker {
 
  private:
   LiveSet& set_of(SymbolId symbol) {
-    return live_[static_cast<std::size_t>(to_underlying(symbol))];
+    return (*live_)[static_cast<std::size_t>(to_underlying(symbol))];
   }
 
-  std::vector<LiveSet>& live_;
-  Stats& stats_;
+  std::vector<LiveSet>* live_;
+  Stats* stats_;
 };
 
 /// Generates the commands of one run.
@@ -164,16 +164,18 @@ class Generator {
     const std::uint64_t modify = live_count == 0 ? 0 : config_.mix.modify;
     const std::uint64_t total = passive + aggressive + cancel + modify;
 
-    std::uint64_t pick = total == 0 ? 0 : rng_.below(total);
+    const std::uint64_t pick = total == 0 ? 0 : rng_.below(total);
     Command command;
     if (pick < passive || total == 0) {
       command = passive_order(symbol, bid, ask, reference_[index]);
-    } else if ((pick -= passive) < aggressive) {
+    } else if (pick < passive + aggressive) {
       command = aggressive_order(symbol, bid, ask, reference_[index]);
-    } else if ((pick -= aggressive) < cancel) {
+    } else if (pick < passive + aggressive + cancel) {
       command = CancelOrder{symbol, live.pick(rng_)};
     } else {
-      command = modify_order(symbol, book, live.pick(rng_));
+      const OrderId id = live.pick(rng_);
+      const std::optional<OrderView> order = book.find(id);  // Always live.
+      command = order ? Command{modify_order(symbol, *order)} : Command{CancelOrder{symbol, id}};
     }
 
     engine_.apply(command, tracker_);
@@ -215,15 +217,8 @@ class Generator {
     order.type =
         rng_.chance(config_.post_only_percent, 100) ? OrderType::post_only : OrderType::limit;
     const std::int64_t distance = distance_.sample(rng_);
-    if (order.side == Side::buy) {
-      const std::int64_t anchor =
-          ask ? ask->price.value() - 1 : (bid ? bid->price.value() : reference - 1);
-      order.price = Price{anchor - distance};
-    } else {
-      const std::int64_t anchor =
-          bid ? bid->price.value() + 1 : (ask ? ask->price.value() : reference + 1);
-      order.price = Price{anchor + distance};
-    }
+    const std::int64_t anchor = passive_anchor(order.side, bid, ask, reference);
+    order.price = Price{order.side == Side::buy ? anchor - distance : anchor + distance};
     order.qty = lots(10);
     return order;
   }
@@ -246,19 +241,47 @@ class Generator {
                      ? OrderType::fok
                      : OrderType::ioc;
     const auto through = static_cast<std::int64_t>(rng_.below(3));
-    if (order.side == Side::buy) {
-      order.price =
-          Price{ask ? ask->price.value() + through : (bid ? bid->price.value() : reference)};
-    } else {
-      order.price =
-          Price{bid ? bid->price.value() - through : (ask ? ask->price.value() : reference)};
-    }
+    order.price = Price{marketable_price(order.side, bid, ask, reference, through)};
     return order;
   }
 
-  ModifyOrder modify_order(SymbolId symbol, const ReferenceBook& book, OrderId id) {
-    const OrderView order = *book.find(id);
-    ModifyOrder request{symbol, id, order.price, order.qty};
+  /// Where a passive order of `side` starts before stepping back from the
+  /// touch: one tick inside the opposite best, else at its own best, else
+  /// one tick from the reference price.
+  static std::int64_t passive_anchor(Side side, const std::optional<LevelView>& bid,
+                                     const std::optional<LevelView>& ask,
+                                     std::int64_t reference) noexcept {
+    if (side == Side::buy) {
+      if (ask) {
+        return ask->price.value() - 1;
+      }
+      return bid ? bid->price.value() : reference - 1;
+    }
+    if (bid) {
+      return bid->price.value() + 1;
+    }
+    return ask ? ask->price.value() : reference + 1;
+  }
+
+  /// Limit price of a marketable IOC/FOK: `through` ticks past the opposite
+  /// best; without one, it cannot cross.
+  static std::int64_t marketable_price(Side side, const std::optional<LevelView>& bid,
+                                       const std::optional<LevelView>& ask, std::int64_t reference,
+                                       std::int64_t through) noexcept {
+    if (side == Side::buy) {
+      if (ask) {
+        return ask->price.value() + through;
+      }
+      return bid ? bid->price.value() : reference;
+    }
+    if (bid) {
+      return bid->price.value() - through;
+    }
+    return ask ? ask->price.value() : reference;
+  }
+
+  ModifyOrder modify_order(SymbolId symbol, const OrderView& order) {
+    ModifyOrder request{symbol, order.id, order.price, order.qty};
     const std::uint64_t kind = rng_.below(10);
     if (kind < 6 && order.qty > Qty{1}) {
       request.qty = Qty{1 + static_cast<std::int64_t>(

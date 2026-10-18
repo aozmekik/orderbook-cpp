@@ -17,8 +17,8 @@ struct NewOrder {
   OwnerId owner{};                    ///< Owner for self-trade prevention; zero is anonymous.
   Side side = Side::buy;              ///< Buy or sell.
   OrderType type = OrderType::limit;  ///< Order type.
-  Price price{};                      ///< Limit price in ticks; ignored for market orders.
-  Qty qty{};                          ///< Quantity in lots, in [1, kMaxOrderQty].
+  Price price;                        ///< Limit price in ticks; ignored for market orders.
+  Qty qty;                            ///< Quantity in lots, in [1, kMaxOrderQty].
 
   /// Member-wise equality.
   friend bool operator==(const NewOrder&, const NewOrder&) = default;
@@ -42,8 +42,8 @@ struct CancelOrder {
 struct ModifyOrder {
   SymbolId symbol{};  ///< Routes the request inside an engine; a book ignores it.
   OrderId id{};       ///< The order to modify.
-  Price price{};      ///< New limit price (equal to the current one to change only the size).
-  Qty qty{};          ///< New open (unfilled) quantity, in [1, kMaxOrderQty].
+  Price price;        ///< New limit price (equal to the current one to change only the size).
+  Qty qty;            ///< New open (unfilled) quantity, in [1, kMaxOrderQty].
 
   /// Member-wise equality.
   friend bool operator==(const ModifyOrder&, const ModifyOrder&) = default;
@@ -54,7 +54,14 @@ using Command = std::variant<NewOrder, CancelOrder, ModifyOrder>;
 
 /// The symbol a command is addressed to.
 [[nodiscard]] constexpr SymbolId symbol_of(const Command& command) noexcept {
-  return std::visit([](const auto& c) noexcept { return c.symbol; }, command);
+  if (const auto* order = std::get_if<NewOrder>(&command)) {
+    return order->symbol;
+  }
+  if (const auto* cancel = std::get_if<CancelOrder>(&command)) {
+    return cancel->symbol;
+  }
+  const auto* modify = std::get_if<ModifyOrder>(&command);
+  return modify != nullptr ? modify->symbol : SymbolId{};
 }
 
 }  // namespace ob

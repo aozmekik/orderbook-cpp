@@ -5,6 +5,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <exception>
+#include <format>
 #include <optional>
 #include <span>
 #include <string>
@@ -48,8 +50,7 @@ options (defaults in brackets):
 )";
 
 int usage_error(std::string_view message) {
-  std::fprintf(stderr, "obgen: %.*s\n(see obgen --help)\n", static_cast<int>(message.size()),
-               message.data());
+  ob::cli::write(stderr, std::format("obgen: {}\n(see obgen --help)\n", message));
   return 2;
 }
 
@@ -58,32 +59,28 @@ std::string percent(std::uint64_t part, std::uint64_t whole) {
   if (whole == 0) {
     return "0.0%";
   }
-  const std::uint64_t tenths = (part * 1000 + whole / 2) / whole;
-  return std::to_string(tenths / 10) + "." + std::to_string(tenths % 10) + "%";
+  const std::uint64_t tenths = ((part * 1000) + (whole / 2)) / whole;
+  return std::format("{}.{}%", tenths / 10, tenths % 10);
 }
 
 void print_summary(const ob::workload::Workload& workload) {
   const ob::workload::Stats& s = workload.stats;
   const std::uint64_t total = workload.commands.size();
   const std::uint64_t ended = s.ended_cancelled + s.ended_filled;
-  std::fprintf(stderr,
-               "obgen: %llu commands over %zu symbol(s): new %s, cancel %s, modify %s\n"
-               "obgen: %llu new orders, %s marketable; %llu rested, %llu fills\n"
-               "obgen: of %llu resting orders that left the book, %s were cancelled and %s "
-               "filled; %llu still resting\n",
-               static_cast<unsigned long long>(total), workload.symbols.size(),
-               percent(s.new_orders, total).c_str(), percent(s.cancels, total).c_str(),
-               percent(s.modifies, total).c_str(), static_cast<unsigned long long>(s.new_orders),
-               percent(s.aggressive, s.new_orders).c_str(),
-               static_cast<unsigned long long>(s.rested), static_cast<unsigned long long>(s.fills),
-               static_cast<unsigned long long>(ended), percent(s.ended_cancelled, ended).c_str(),
-               percent(s.ended_filled, ended).c_str(),
-               static_cast<unsigned long long>(s.live_at_end));
+  ob::cli::write(
+      stderr,
+      std::format("obgen: {} commands over {} symbol(s): new {}, cancel {}, modify {}\n"
+                  "obgen: {} new orders, {} marketable; {} rested, {} fills\n"
+                  "obgen: of {} resting orders that left the book, {} were cancelled and {} "
+                  "filled; {} still resting\n",
+                  total, workload.symbols.size(), percent(s.new_orders, total),
+                  percent(s.cancels, total), percent(s.modifies, total), s.new_orders,
+                  percent(s.aggressive, s.new_orders), s.rested, s.fills, ended,
+                  percent(s.ended_cancelled, ended), percent(s.ended_filled, ended),
+                  s.live_at_end));
 }
 
-}  // namespace
-
-int main(int argc, char** argv) {
+int run(int argc, char** argv) {
   ob::workload::Config config;
   bool quiet = false;
   const std::span<char*> args(argv, static_cast<std::size_t>(argc));
@@ -93,8 +90,8 @@ int main(int argc, char** argv) {
       return usage_error("unexpected argument " + std::string(raw));
     }
     if (option->name == "help") {
-      std::fputs(kUsage.data(), stdout);
-      return 0;
+      ob::cli::write(stdout, kUsage);
+      return ob::cli::finish(0);
     }
     if (option->name == "quiet") {
       quiet = true;
@@ -162,9 +159,21 @@ int main(int argc, char** argv) {
     }
   }
   ob::cli::flush_to_stdout(out);
-  std::fflush(stdout);
   if (!quiet) {
     print_summary(workload);
   }
-  return 0;
+  return ob::cli::finish(0);
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+  try {
+    return run(argc, argv);
+  } catch (const std::exception& error) {
+    ob::cli::write(stderr, "obgen: ");
+    ob::cli::write(stderr, error.what());
+    ob::cli::write(stderr, "\n");
+    return 1;
+  }
 }

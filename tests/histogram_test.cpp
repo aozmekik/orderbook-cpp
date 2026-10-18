@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -42,7 +43,7 @@ TEST(LatencyHistogramTest, BucketsAreContiguousAndBounded) {
     const std::size_t index = LatencyHistogram::index_of(v);
     const std::uint64_t highest = LatencyHistogram::highest_in_bucket(index);
     ASSERT_GE(highest, v);
-    ASSERT_LE(highest - v, v / 64 + 1) << v;  // Within 1/64 relative error.
+    ASSERT_LE(highest - v, (v / 64) + 1) << v;  // Within 1/64 relative error.
     ASSERT_EQ(LatencyHistogram::index_of(highest), index);
     ASSERT_EQ(LatencyHistogram::index_of(highest + 1), index + 1);
   }
@@ -60,14 +61,14 @@ TEST(LatencyHistogramTest, QuantilesMatchSortedDataWithinTheBucketError) {
     values.push_back(v);
     h->record(v);
   }
-  std::sort(values.begin(), values.end());
+  std::ranges::sort(values);
   for (const auto [numerator, denominator] :
        {std::pair<std::uint64_t, std::uint64_t>{1, 2}, {9, 10}, {99, 100}, {999, 1000}}) {
-    const std::size_t rank = (values.size() * numerator + denominator - 1) / denominator;
+    const std::size_t rank = ((values.size() * numerator) + denominator - 1) / denominator;
     const std::uint64_t exact = values[rank - 1];
     const std::uint64_t reported = h->quantile(numerator, denominator);
     EXPECT_GE(reported, exact);
-    EXPECT_LE(reported - exact, exact / 64 + 1) << numerator << "/" << denominator;
+    EXPECT_LE(reported - exact, (exact / 64) + 1) << numerator << "/" << denominator;
   }
   EXPECT_EQ(h->max(), values.back());
   EXPECT_EQ(h->quantile(1, 1), values.back());

@@ -10,7 +10,9 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -45,7 +47,7 @@ class LadderLevels {
   /// Smallest window, in ticks.
   static constexpr std::uint32_t kMinWindow = 64;
   /// Largest window, in ticks (4 MiB of slots per side).
-  static constexpr std::uint32_t kMaxWindow = std::uint32_t{1} << 20;
+  static constexpr std::uint32_t kMaxWindow = std::uint32_t{1} << 20U;
 
   /// Creates an empty index whose window spans `window_ticks` (rounded up to
   /// a power of two and clamped to `[kMinWindow, kMaxWindow]`).
@@ -72,7 +74,7 @@ class LadderLevels {
   /// The level stored for `key`; if there is none, stores and returns
   /// `make()`. Allocates only if the overflow outgrows its capacity.
   template <class Make>
-  detail::Index find_or_insert(LevelKey key, Make&& make) {
+  detail::Index find_or_insert(LevelKey key, Make make) {
     if (ring_count_ == 0) {
       assert(overflow_.empty());
       base_ = key - headroom_;
@@ -100,7 +102,8 @@ class LadderLevels {
         return;
       }
       if (key == best_) {
-        best_ = *next_occupied(key + 1, base_ + window_);
+        // The ring is not empty, so a next level exists; value_or is never used.
+        best_ = next_occupied(key + 1, base_ + window_).value_or(best_);
         if (best_ - base_ >= recenter_distance_) {
           shift_up(best_ - headroom_);
         }
@@ -124,7 +127,7 @@ class LadderLevels {
   /// Calls `visit(key, level)` from the best level to the worst until it
   /// returns false.
   template <class Visit>
-  void for_each(Visit&& visit) const {
+  void for_each(Visit visit) const {
     if (ring_count_ > 0) {
       const LevelKey end = base_ + window_;
       for (std::optional<LevelKey> key = best_; key; key = next_occupied(*key + 1, end)) {
@@ -133,8 +136,8 @@ class LadderLevels {
         }
       }
     }
-    for (auto it = overflow_.rbegin(); it != overflow_.rend(); ++it) {
-      if (!visit(it->key, it->level)) {
+    for (const Entry& entry : overflow_ | std::views::reverse) {
+      if (!visit(entry.key, entry.level)) {
         return;
       }
     }
@@ -179,7 +182,7 @@ class LadderLevels {
     }
     for (std::size_t word = 0; word < bits_.size(); ++word) {
       for (std::uint64_t bits = bits_[word]; bits != 0; bits &= bits - 1) {
-        const std::size_t slot = word * 64 + static_cast<std::size_t>(std::countr_zero(bits));
+        const std::size_t slot = (word * 64) + static_cast<std::size_t>(std::countr_zero(bits));
         if (slots_[slot] == detail::kNil) {
           return "ladder: bitmap marks an empty slot";
         }
@@ -293,8 +296,7 @@ class LadderLevels {
 
   [[nodiscard]] std::vector<Entry>::const_iterator overflow_lower_bound(LevelKey key) const {
     // First entry whose key is <= `key` (the vector is sorted descending).
-    return std::lower_bound(overflow_.begin(), overflow_.end(), key,
-                            [](const Entry& entry, LevelKey k) { return entry.key > k; });
+    return std::ranges::lower_bound(overflow_, key, std::ranges::greater{}, &Entry::key);
   }
 
   [[nodiscard]] detail::Index overflow_find(LevelKey key) const noexcept {

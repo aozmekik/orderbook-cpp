@@ -7,8 +7,8 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
 #include <functional>
+#include <iostream>
 #include <map>
 #include <type_traits>
 #include <vector>
@@ -118,13 +118,12 @@ int main() {
     const bool match = same_levels(feed.book(i).bids, bids) && same_levels(feed.book(i).asks, asks);
     all_match = all_match && match;
     const std::int64_t volume = feed.volume(i);
-    std::printf("%s: %zu bid / %zu ask levels, volume %lld, VWAP %lld ticks, L2 mirror %s\n",
-                workload.symbols[i].c_str(), bids.size(), asks.size(),
-                static_cast<long long>(volume),
-                static_cast<long long>(volume == 0 ? 0 : feed.notional(i) / volume),
-                match ? "matches the book" : "DIFFERS");
+    std::cout << workload.symbols[i] << ": " << bids.size() << " bid / " << asks.size()
+              << " ask levels, volume " << volume << ", VWAP "
+              << (volume == 0 ? 0 : feed.notional(i) / volume) << " ticks, L2 mirror "
+              << (match ? "matches the book" : "DIFFERS") << '\n';
   }
-  std::printf("%llu trades from %zu synthetic commands\n",
-              static_cast<unsigned long long>(feed.trades()), workload.commands.size());
+  std::cout << feed.trades() << " trades from " << workload.commands.size()
+            << " synthetic commands\n";
   return all_match ? 0 : 1;
 }

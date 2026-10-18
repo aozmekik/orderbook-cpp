@@ -12,6 +12,8 @@
 #include <string_view>
 #include <vector>
 
+#include <gtest/gtest.h>
+
 #include <orderbook/book_api.hpp>
 #include <orderbook/commands.hpp>
 #include <orderbook/events.hpp>
@@ -117,7 +119,7 @@ class Harness {
   }
 
   /// Ids at `price` on `side`, in queue order.
-  std::vector<std::uint64_t> queue(Side side, std::int64_t price) const {
+  [[nodiscard]] std::vector<std::uint64_t> queue(Side side, std::int64_t price) const {
     std::vector<std::uint64_t> ids;
     book.for_each_order(side, Price{price},
                         [&](const OrderView& view) { ids.push_back(to_underlying(view.id)); });
@@ -125,7 +127,7 @@ class Harness {
   }
 
   /// Up to `levels` levels of `side`, best first.
-  std::vector<LevelView> depth(Side side, std::size_t levels = 64) const {
+  [[nodiscard]] std::vector<LevelView> depth(Side side, std::size_t levels = 64) const {
     std::vector<LevelView> out(levels);
     out.resize(book.depth(side, out));
     return out;
@@ -143,6 +145,17 @@ class Harness {
     return render(sink.events);
   }
 };
+
+/// The resting order `id` of `book`; records a test failure if it is not live.
+template <OrderBookLike Book>
+OrderView live_order(const Book& book, std::uint64_t id) {
+  const std::optional<OrderView> order = book.find(OrderId{id});
+  if (!order.has_value()) {
+    ADD_FAILURE() << "order " << id << " is not resting";
+    return OrderView{};
+  }
+  return *order;
+}
 
 /// Shorthand for building expected event lines.
 using Lines = std::vector<std::string>;

@@ -21,8 +21,9 @@
 
 namespace {
 
-std::atomic<std::uint64_t> g_allocations{0};
-std::atomic<bool> g_counting{false};
+// The replaced allocation functions must reach these, so they are globals.
+std::atomic<std::uint64_t> g_allocations{0};  // NOLINT(*-avoid-non-const-global-variables)
+std::atomic<bool> g_counting{false};          // NOLINT(*-avoid-non-const-global-variables)
 
 void* counted_allocate(std::size_t size, std::size_t alignment) {
   if (g_counting.load(std::memory_order_relaxed)) {
@@ -31,7 +32,7 @@ void* counted_allocate(std::size_t size, std::size_t alignment) {
   void* memory = nullptr;
   const std::size_t bytes = size == 0 ? 1 : size;
   if (alignment <= alignof(std::max_align_t)) {
-    memory = std::malloc(bytes);  // NOLINT(cppcoreguidelines-no-malloc)
+    memory = std::malloc(bytes);  // NOLINT(cppcoreguidelines-no-malloc,*-owning-memory)
   } else if (posix_memalign(&memory, alignment, bytes) != 0) {
     memory = nullptr;
   }
@@ -43,7 +44,7 @@ void* counted_allocate(std::size_t size, std::size_t alignment) {
 
 }  // namespace
 
-// NOLINTBEGIN(cppcoreguidelines-no-malloc,misc-use-internal-linkage)
+// NOLINTBEGIN(cppcoreguidelines-no-malloc,cppcoreguidelines-owning-memory,misc-use-internal-linkage)
 void* operator new(std::size_t size) {
   return counted_allocate(size, 0);
 }
@@ -94,7 +95,7 @@ void operator delete(void* memory, std::size_t /*size*/, std::align_val_t /*alig
 void operator delete[](void* memory, std::size_t /*size*/, std::align_val_t /*align*/) noexcept {
   std::free(memory);
 }
-// NOLINTEND(cppcoreguidelines-no-malloc,misc-use-internal-linkage)
+// NOLINTEND(cppcoreguidelines-no-malloc,cppcoreguidelines-owning-memory,misc-use-internal-linkage)
 
 namespace ob {
 namespace {

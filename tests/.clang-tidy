@@ -1,0 +1,19 @@
+---
+# Tests inherit the strict configuration, minus checks that fight GoogleTest:
+#   readability-function-cognitive-complexity : every ASSERT_* expands to branches
+#   cppcoreguidelines-non-private-member-variables-in-classes,
+#   misc-non-private-member-variables-in-classes : fixtures share state with TEST_F bodies
+#   readability-inconsistent-declaration-parameter-name : allocation_test replaces the
+#                                     global operator new, declared with reserved names
+#   readability-identifier-naming.ProtectedMemberSuffix : fixture members are used as
+#                                     `this->h` from typed tests
+InheritParentConfig: true
+Checks: >
+  -readability-function-cognitive-complexity,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -misc-non-private-member-variables-in-classes,
+  -readability-inconsistent-declaration-parameter-name
+CheckOptions:
+  - key: readability-identifier-naming.ProtectedMemberSuffix
+    value: ''
+...

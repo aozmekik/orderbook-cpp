@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include <cstddef>
+#include <ranges>
 #include <span>
 #include <string>
 #include <string_view>
@@ -18,40 +19,40 @@ namespace {
 /// Builds one `key=value` line.
 class Line {
  public:
-  Line(std::string& out, std::string_view kind, std::string_view symbol) : out_(out) {
-    out_ += kind;
-    out_ += ' ';
-    out_ += symbol;
+  Line(std::string& out, std::string_view kind, std::string_view symbol) : out_(&out) {
+    *out_ += kind;
+    *out_ += ' ';
+    *out_ += symbol;
   }
 
   /// Terminates the line.
-  void end() { out_ += '\n'; }
+  void end() { *out_ += '\n'; }
 
   Line& word(std::string_view text) {
-    out_ += ' ';
-    out_ += text;
+    *out_ += ' ';
+    *out_ += text;
     return *this;
   }
 
   Line& field(std::string_view key, std::string_view value) {
-    out_ += ' ';
-    out_ += key;
-    out_ += '=';
-    out_ += value;
+    *out_ += ' ';
+    *out_ += key;
+    *out_ += '=';
+    *out_ += value;
     return *this;
   }
 
   template <class Int>
   Line& number(std::string_view key, Int value) {
-    out_ += ' ';
-    out_ += key;
-    out_ += '=';
-    detail::append_number(out_, value);
+    *out_ += ' ';
+    *out_ += key;
+    *out_ += '=';
+    detail::append_number(*out_, value);
     return *this;
   }
 
  private:
-  std::string& out_;
+  std::string* out_;
 };
 
 [[nodiscard]] std::string_view level_side(Side side) noexcept {
@@ -141,8 +142,8 @@ void append_snapshot(std::string& out, std::string_view symbol, std::span<const 
         .number("orders", view.count)
         .end();
   };
-  for (auto it = asks.rbegin(); it != asks.rend(); ++it) {
-    level(Side::sell, *it);
+  for (const LevelView& view : asks | std::views::reverse) {
+    level(Side::sell, view);
   }
   for (const LevelView& view : bids) {
     level(Side::buy, view);

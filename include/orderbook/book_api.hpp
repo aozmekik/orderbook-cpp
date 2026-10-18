@@ -43,8 +43,8 @@ struct BookConfig {
 
 /// Aggregate view of one price level.
 struct LevelView {
-  Price price{};          ///< Price of the level.
-  Qty qty{};              ///< Total open quantity.
+  Price price;            ///< Price of the level.
+  Qty qty;                ///< Total open quantity.
   std::uint32_t count{};  ///< Number of orders.
 
   /// Member-wise equality.
@@ -57,8 +57,8 @@ struct OrderView {
   OwnerId owner{};                    ///< Owner.
   Side side = Side::buy;              ///< Side.
   OrderType type = OrderType::limit;  ///< Type (`limit` or `post_only`: only these rest).
-  Price price{};                      ///< Limit price.
-  Qty qty{};                          ///< Open quantity.
+  Price price;                        ///< Limit price.
+  Qty qty;                            ///< Open quantity.
 
   /// Member-wise equality.
   friend bool operator==(const OrderView&, const OrderView&) = default;

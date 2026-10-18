@@ -4,7 +4,7 @@
 //   cmake --preset dev && cmake --build --preset dev
 //   ./build/dev/examples/example_basic
 
-#include <cstdio>
+#include <iostream>
 #include <string>
 
 #include <orderbook/orderbook.hpp>
@@ -17,7 +17,7 @@ int main() {
   auto print = [&](const auto& event) {
     std::string line;
     ob::append_event(line, event, engine.symbol_names());
-    std::fputs(line.c_str(), stdout);
+    std::cout << line;
   };
 
   using ob::OrderId;
@@ -44,9 +44,8 @@ int main() {
 
   const ob::OrderBook& book = *engine.find_book(aapl);
   if (const auto bid = book.best_bid()) {
-    std::printf("best bid: %lld x %lld\n", static_cast<long long>(bid->price.value()),
-                static_cast<long long>(bid->qty.value()));
+    std::cout << "best bid: " << bid->price.value() << " x " << bid->qty.value() << '\n';
   }
-  std::printf("resting orders: %zu\n", book.order_count());
+  std::cout << "resting orders: " << book.order_count() << '\n';
   return 0;
 }

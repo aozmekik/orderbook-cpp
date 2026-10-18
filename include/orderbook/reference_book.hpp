@@ -11,6 +11,7 @@
 #include <list>
 #include <map>
 #include <optional>
+#include <ranges>
 #include <span>
 #include <string>
 #include <unordered_map>
@@ -159,7 +160,7 @@ class ReferenceBook {
   [[nodiscard]] std::optional<LevelView> best_ask() const { return best(Side::sell); }
 
   /// Writes up to `out.size()` levels of `side`, best first; returns the count.
-  std::size_t depth(Side side, std::span<LevelView> out) const {
+  [[nodiscard]] std::size_t depth(Side side, std::span<LevelView> out) const {
     std::size_t written = 0;
     const auto copy = [&](const auto& first, const auto& last) {
       for (auto it = first; it != last && written < out.size(); ++it) {
@@ -182,14 +183,13 @@ class ReferenceBook {
     }
     const Location location = found->second;
     const Queue& queue = levels(location.side).at(location.price);
-    const auto it = std::find_if(queue.begin(), queue.end(),
-                                 [&](const Resting& resting) { return resting.id == id; });
+    const auto it = std::ranges::find(queue, id, &Resting::id);
     return OrderView{it->id, it->owner, location.side, it->type, location.price, it->qty};
   }
 
   /// Calls `visit(OrderView)` for the orders at `price` on `side`, in priority.
   template <class Visit>
-  void for_each_order(Side side, Price price, Visit&& visit) const {
+  void for_each_order(Side side, Price price, Visit visit) const {
     const auto level = levels(side).find(price);
     if (level == levels(side).end()) {
       return;
@@ -237,24 +237,24 @@ class ReferenceBook {
 
  private:
   struct Resting {
-    OrderId id;
-    OwnerId owner;
-    OrderType type;
+    OrderId id{};
+    OwnerId owner{};
+    OrderType type = OrderType::limit;
     Qty qty;
   };
   using Queue = std::list<Resting>;
   using Levels = std::map<Price, Queue>;  // Ascending price on both sides.
 
   struct Location {
-    Side side;
+    Side side = Side::buy;
     Price price;
   };
 
   struct Incoming {
-    OrderId id;
-    OwnerId owner;
-    Side side;
-    bool any_price;
+    OrderId id{};
+    OwnerId owner{};
+    Side side = Side::buy;
+    bool any_price = false;
     Price limit;
 
     /// True if this order may trade at `price`.
@@ -290,8 +290,7 @@ class ReferenceBook {
   }
 
   [[nodiscard]] static Queue::iterator find_in(Queue& queue, OrderId id) {
-    return std::find_if(queue.begin(), queue.end(),
-                        [&](const Resting& resting) { return resting.id == id; });
+    return std::ranges::find(queue, id, &Resting::id);
   }
 
   [[nodiscard]] static LevelView view_of(Price price, const Queue& queue) {
@@ -351,8 +350,8 @@ class ReferenceBook {
         }
       }
     } else {
-      for (auto it = bids_.rbegin(); it != bids_.rend(); ++it) {
-        if (!count_level(it->first, it->second)) {
+      for (const auto& [price, queue] : bids_ | std::views::reverse) {
+        if (!count_level(price, queue)) {
           break;
         }
       }

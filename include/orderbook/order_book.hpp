@@ -43,8 +43,10 @@ namespace detail {
 
 /// Prints `what` and aborts. Used by the debug-build invariant checks.
 [[noreturn]] inline void invariant_failure(std::string_view what) noexcept {
-  std::fprintf(stderr, "orderbook: invariant violated: %.*s\n", static_cast<int>(what.size()),
-               what.data());
+  constexpr std::string_view kPrefix = "orderbook: invariant violated: ";
+  static_cast<void>(std::fwrite(kPrefix.data(), 1, kPrefix.size(), stderr));
+  static_cast<void>(std::fwrite(what.data(), 1, what.size(), stderr));
+  static_cast<void>(std::fputc('\n', stderr));
   std::abort();
 }
 
@@ -154,7 +156,7 @@ class BasicOrderBook {
 
   /// Writes up to `out.size()` levels of `side`, best first, into `out`;
   /// returns how many were written. Does not allocate.
-  std::size_t depth(Side side, std::span<LevelView> out) const noexcept {
+  [[nodiscard]] std::size_t depth(Side side, std::span<LevelView> out) const noexcept {
     std::size_t written = 0;
     if (out.empty()) {
       return written;
@@ -178,7 +180,7 @@ class BasicOrderBook {
   /// Calls `visit(OrderView)` for every order resting at `price` on `side`,
   /// in time priority (first in the queue first).
   template <class Visit>
-  void for_each_order(Side side, Price price, Visit&& visit) const {
+  void for_each_order(Side side, Price price, Visit visit) const {
     const detail::Index level = index_of(side).find(level_key(side, price));
     if (level == detail::kNil) {
       return;
@@ -247,7 +249,7 @@ class BasicOrderBook {
  private:
   struct OrderNode {
     OrderId id{};
-    Qty qty{};
+    Qty qty;
     OwnerId owner{};
     detail::Index prev = detail::kNil;
     detail::Index next = detail::kNil;
@@ -257,12 +259,16 @@ class BasicOrderBook {
   };
 
   struct Level {
-    Price price{};
-    Qty total{};
+    Price price;
+    Qty total;
     detail::Index head = detail::kNil;
     detail::Index tail = detail::kNil;
     std::uint32_t count = 0;
   };
+
+  // Cache footprint: 40 and 32 bytes on 64-bit platforms.
+  static_assert(sizeof(OrderNode) <= 40);
+  static_assert(sizeof(Level) <= 32);
 
   /// The incoming side of a match. `limit` is the worst acceptable maker
   /// key: maker levels with a larger key do not cross.
@@ -471,8 +477,8 @@ class BasicOrderBook {
   /// cancelled it (in which case the `Cancelled` event was emitted here).
   template <Side S, EventSink Sink>
   Qty match(const Taker& taker, Qty qty, Sink& sink) noexcept {
-    constexpr Side maker_side = opposite(S);
-    Levels& makers = index_of<maker_side>();
+    constexpr Side kMakerSide = opposite(S);
+    Levels& makers = index_of<kMakerSide>();
     const bool stp = stp_applies(taker.owner);
     while (qty > Qty{0}) {
       const detail::Index level_index = makers.best();
@@ -507,10 +513,10 @@ class BasicOrderBook {
         node = next;
       }
       if (touched) {
-        emit_delta(maker_side, level, sink);
+        emit_delta(kMakerSide, level, sink);
       }
       if (level.count == 0) {
-        erase_level(maker_side, level_index);
+        erase_level(kMakerSide, level_index);
       }
       if (self_trade_stop) {
         emit_cancelled(taker.id, qty, CancelReason::self_trade, sink);

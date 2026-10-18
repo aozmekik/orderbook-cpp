@@ -107,7 +107,8 @@ class RandomFlow {
   void observe(const Command& command, const std::vector<Event>& events,
                const ReferenceBook& book) {
     for (const Event& event : events) {
-      if (const auto* fill = std::get_if<Fill>(&event); fill && fill->maker_remaining == Qty{0}) {
+      if (const auto* fill = std::get_if<Fill>(&event);
+          fill != nullptr && fill->maker_remaining == Qty{0}) {
         live_.remove(fill->maker_id);
       } else if (const auto* cancelled = std::get_if<Cancelled>(&event)) {
         live_.remove(cancelled->id);
@@ -145,7 +146,7 @@ class RandomFlow {
       return kMaxPrice.value() + 1;  // Invalid.
     }
     if (r < 330) {
-      return center_ + rng_.between(-3, 3) * static_cast<std::int64_t>(window_);
+      return center_ + (rng_.between(-3, 3) * static_cast<std::int64_t>(window_));
     }
     return center_ + rng_.between(-12, 12);
   }
@@ -188,15 +189,23 @@ class RandomFlow {
     }
     order.owner = OwnerId{static_cast<std::uint32_t>(rng_.below(4))};
     order.side = rng_.chance(1, 2) ? Side::buy : Side::sell;
-    const std::uint64_t type = rng_.below(100);
-    order.type = type < 45   ? OrderType::limit
-                 : type < 57 ? OrderType::post_only
-                 : type < 72 ? OrderType::ioc
-                 : type < 85 ? OrderType::fok
-                             : OrderType::market;
+    order.type = type_for(rng_.below(100));
     order.price = Price{price()};
     order.qty = Qty{qty()};
     return order;
+  }
+
+  static OrderType type_for(std::uint64_t roll) noexcept {
+    if (roll < 45) {
+      return OrderType::limit;
+    }
+    if (roll < 57) {
+      return OrderType::post_only;
+    }
+    if (roll < 72) {
+      return OrderType::ioc;
+    }
+    return roll < 85 ? OrderType::fok : OrderType::market;
   }
 
   ModifyOrder modify(const ReferenceBook& book) {
@@ -323,7 +332,7 @@ std::vector<DiffParams> all_params() {
        {StpPolicy::none, StpPolicy::cancel_newest, StpPolicy::cancel_oldest}) {
     for (const std::uint32_t ladder : {64U, 4096U}) {
       for (std::uint64_t seed = 1; seed <= 4; ++seed) {
-        params.push_back(DiffParams{seed * 7919 + ladder, stp, ladder});
+        params.push_back(DiffParams{(seed * 7919) + ladder, stp, ladder});
       }
     }
   }

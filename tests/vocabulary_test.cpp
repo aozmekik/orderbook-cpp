@@ -94,14 +94,14 @@ TEST(ValidationTest, ChecksIdThenQuantityThenPrice) {
 // The fallback is tested directly so that it is covered even when the
 // standard library provides std::expected.
 TEST(ExpectedTest, FallbackHoldsAValueOrAnError) {
-  using Result = detail::expected_fallback<std::string, int>;
+  using Result = detail::ExpectedFallback<std::string, int>;
   const Result value = std::string("ok");
   ASSERT_TRUE(value.has_value());
   EXPECT_TRUE(static_cast<bool>(value));
   EXPECT_EQ(*value, "ok");
   EXPECT_EQ(value->size(), 2U);
 
-  const Result error = detail::unexpected_fallback<int>(42);
+  const Result error = detail::UnexpectedFallback<int>(42);
   ASSERT_FALSE(error.has_value());
   EXPECT_EQ(error.error(), 42);
 
@@ -114,9 +114,11 @@ TEST(ExpectedTest, AliasMatchesTheStandardLibrary) {
 #if OB_HAS_STD_EXPECTED
   static_assert(std::is_same_v<expected<int, char>, std::expected<int, char>>);
 #else
-  static_assert(std::is_same_v<expected<int, char>, detail::expected_fallback<int, char>>);
+  static_assert(std::is_same_v<expected<int, char>, detail::ExpectedFallback<int, char>>);
 #endif
-  const auto failing = []() -> expected<int, std::string> { return make_unexpected("bad"); };
+  const auto failing = []() -> expected<int, std::string> {
+    return make_unexpected(std::string("bad"));
+  };
   const auto working = []() -> expected<int, std::string> { return 7; };
   EXPECT_EQ(failing().error(), "bad");
   EXPECT_EQ(*working(), 7);

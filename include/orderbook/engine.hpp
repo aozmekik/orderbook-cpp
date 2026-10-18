@@ -12,6 +12,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -80,7 +81,8 @@ class BasicEngine {
 
   /// Submits a new order to the book of `order.symbol`.
   template <EventSink Sink>
-  void submit(const NewOrder& order, Sink& sink) noexcept {
+  void submit(const NewOrder& order,
+              Sink& sink) noexcept(noexcept(std::declval<Book&>().submit(order, sink))) {
     if (Book* book = book_of(order.symbol)) {
       book->submit(order, sink);
     } else {
@@ -90,7 +92,8 @@ class BasicEngine {
 
   /// Cancels a resting order of `request.symbol`.
   template <EventSink Sink>
-  void cancel(const CancelOrder& request, Sink& sink) noexcept {
+  void cancel(const CancelOrder& request,
+              Sink& sink) noexcept(noexcept(std::declval<Book&>().cancel(request, sink))) {
     if (Book* book = book_of(request.symbol)) {
       book->cancel(request, sink);
     } else {
@@ -100,7 +103,8 @@ class BasicEngine {
 
   /// Modifies a resting order of `request.symbol`.
   template <EventSink Sink>
-  void modify(const ModifyOrder& request, Sink& sink) noexcept {
+  void modify(const ModifyOrder& request,
+              Sink& sink) noexcept(noexcept(std::declval<Book&>().modify(request, sink))) {
     if (Book* book = book_of(request.symbol)) {
       book->modify(request, sink);
     } else {
@@ -108,9 +112,12 @@ class BasicEngine {
     }
   }
 
-  /// Dispatches any command.
+  /// Dispatches any command. `noexcept` when the book's operations are.
   template <EventSink Sink>
-  void apply(const Command& command, Sink& sink) noexcept {
+  void apply(const Command& command, Sink& sink) noexcept(
+      noexcept(std::declval<BasicEngine&>().submit(std::declval<const NewOrder&>(), sink)) &&
+      noexcept(std::declval<BasicEngine&>().cancel(std::declval<const CancelOrder&>(), sink)) &&
+      noexcept(std::declval<BasicEngine&>().modify(std::declval<const ModifyOrder&>(), sink))) {
     if (const auto* order = std::get_if<NewOrder>(&command)) {
       submit(*order, sink);
     } else if (const auto* cancel_request = std::get_if<CancelOrder>(&command)) {

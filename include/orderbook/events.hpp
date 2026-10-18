@@ -26,8 +26,8 @@ struct Accepted {
   OwnerId owner{};                    ///< Its owner.
   Side side = Side::buy;              ///< Its side.
   OrderType type = OrderType::limit;  ///< Its type.
-  Price price{};                      ///< Its limit price (zero for market orders).
-  Qty qty{};                          ///< Its quantity.
+  Price price;                        ///< Its limit price (zero for market orders).
+  Qty qty;                            ///< Its quantity.
 
   /// Member-wise equality.
   friend bool operator==(const Accepted&, const Accepted&) = default;
@@ -50,10 +50,10 @@ struct Fill {
   OrderId taker_id{};           ///< The incoming order.
   OrderId maker_id{};           ///< The resting order.
   Side taker_side = Side::buy;  ///< Side of the taker; the maker is on the other side.
-  Price price{};                ///< Trade price: always the maker's limit price.
-  Qty qty{};                    ///< Traded quantity.
-  Qty taker_remaining{};        ///< Taker quantity still open after this fill.
-  Qty maker_remaining{};        ///< Maker quantity still open after this fill.
+  Price price;                  ///< Trade price: always the maker's limit price.
+  Qty qty;                      ///< Traded quantity.
+  Qty taker_remaining;          ///< Taker quantity still open after this fill.
+  Qty maker_remaining;          ///< Maker quantity still open after this fill.
 
   /// Member-wise equality.
   friend bool operator==(const Fill&, const Fill&) = default;
@@ -63,7 +63,7 @@ struct Fill {
 struct Cancelled {
   SymbolId symbol{};                              ///< Symbol of the book.
   OrderId id{};                                   ///< The order.
-  Qty qty{};                                      ///< Quantity that was cancelled.
+  Qty qty;                                        ///< Quantity that was cancelled.
   CancelReason reason = CancelReason::requested;  ///< Why.
 
   /// Member-wise equality.
@@ -74,8 +74,8 @@ struct Cancelled {
 struct Modified {
   SymbolId symbol{};           ///< Symbol of the book.
   OrderId id{};                ///< The order.
-  Price price{};               ///< Its new limit price.
-  Qty qty{};                   ///< Its new open quantity.
+  Price price;                 ///< Its new limit price.
+  Qty qty;                     ///< Its new open quantity.
   bool priority_kept = false;  ///< True if it kept its place in the queue.
 
   /// Member-wise equality.
@@ -87,8 +87,8 @@ struct Modified {
 struct BookDelta {
   SymbolId symbol{};      ///< Symbol of the book.
   Side side = Side::buy;  ///< `buy` for a bid level, `sell` for an ask level.
-  Price price{};          ///< Price of the level.
-  Qty qty{};              ///< Total open quantity at the level.
+  Price price;            ///< Price of the level.
+  Qty qty;                ///< Total open quantity at the level.
   std::uint32_t count{};  ///< Number of orders at the level.
 
   /// Member-wise equality.

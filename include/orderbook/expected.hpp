@@ -27,10 +27,10 @@ namespace detail {
 
 /// Fallback for `std::unexpected`: wraps an error value.
 template <class E>
-class unexpected_fallback {
+class UnexpectedFallback {
  public:
   /// Wraps `error`.
-  constexpr explicit unexpected_fallback(E error) noexcept(std::is_nothrow_move_constructible_v<E>)
+  constexpr explicit UnexpectedFallback(E error) noexcept(std::is_nothrow_move_constructible_v<E>)
       : error_(std::move(error)) {}
 
   /// The wrapped error.
@@ -44,19 +44,19 @@ class unexpected_fallback {
   E error_;
 };
 
-/// True for specialisations of `unexpected_fallback`.
+/// True for specialisations of `UnexpectedFallback`.
 template <class T>
-inline constexpr bool is_unexpected_fallback_v = false;
-/// True for specialisations of `unexpected_fallback`.
+inline constexpr bool kIsUnexpectedFallback = false;
+/// True for specialisations of `UnexpectedFallback`.
 template <class E>
-inline constexpr bool is_unexpected_fallback_v<unexpected_fallback<E>> = true;
+inline constexpr bool kIsUnexpectedFallback<UnexpectedFallback<E>> = true;
 
 /// Fallback for `std::expected`: holds either a value or an error.
 ///
 /// Accessing the value of an object that holds an error (or vice versa) is a
 /// precondition violation, exactly as with `operator*` on `std::expected`.
 template <class T, class E>
-class expected_fallback {
+class ExpectedFallback {
  public:
   /// The value type.
   using value_type = T;
@@ -66,15 +66,17 @@ class expected_fallback {
   /// Holds `value`.
   template <class U = T>
     requires std::is_constructible_v<T, U&&> &&
-             (!std::is_same_v<std::remove_cvref_t<U>, expected_fallback>) &&
-             (!is_unexpected_fallback_v<std::remove_cvref_t<U>>)
-  constexpr expected_fallback(U&& value)  // NOLINT(google-explicit-constructor): mirrors std
+             (!std::is_same_v<std::remove_cvref_t<U>, ExpectedFallback>) &&
+             (!kIsUnexpectedFallback<std::remove_cvref_t<U>>)
+  // NOLINTNEXTLINE(*-explicit-constructor): implicit, as in std
+  constexpr ExpectedFallback(U&& value)
       : storage_(std::in_place_index<0>, std::forward<U>(value)) {}
 
   /// Holds the error wrapped by `error`.
   template <class G>
     requires std::is_constructible_v<E, G&&>
-  constexpr expected_fallback(unexpected_fallback<G> error)  // NOLINT(google-explicit-constructor)
+  // NOLINTNEXTLINE(*-explicit-constructor): implicit, as in std
+  constexpr ExpectedFallback(UnexpectedFallback<G> error)
       : storage_(std::in_place_index<1>, std::move(error).error()) {}
 
   /// True if a value is held.
@@ -118,10 +120,10 @@ using unexpected = std::unexpected<E>;
 #else
 /// Fallback with the subset of the `std::expected<T, E>` interface used here.
 template <class T, class E>
-using expected = detail::expected_fallback<T, E>;
+using expected = detail::ExpectedFallback<T, E>;
 /// Fallback for `std::unexpected<E>`.
 template <class E>
-using unexpected = detail::unexpected_fallback<E>;
+using unexpected = detail::UnexpectedFallback<E>;
 #endif
 
 /// Wraps `error` for returning from a function that returns `ob::expected`.

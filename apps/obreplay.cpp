@@ -7,6 +7,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <exception>
+#include <format>
 #include <optional>
 #include <span>
 #include <string>
@@ -60,8 +62,7 @@ struct Options {
 };
 
 int usage_error(std::string_view message) {
-  std::fprintf(stderr, "obreplay: %.*s\n(see obreplay --help)\n", static_cast<int>(message.size()),
-               message.data());
+  ob::cli::write(stderr, std::format("obreplay: {}\n(see obreplay --help)\n", message));
   return 2;
 }
 
@@ -120,8 +121,8 @@ int replay(const Options& options, const std::string& text) {
   ob::CsvReader reader(text);
   while (const auto item = reader.next()) {
     if (!*item) {
-      const std::string where = ob::to_string(item->error());
-      std::fprintf(stderr, "obreplay: %s: %s\n", options.path.c_str(), where.c_str());
+      ob::cli::write(stderr,
+                     std::format("obreplay: {}: {}\n", options.path, ob::to_string(item->error())));
       return 1;
     }
     const ob::CsvRecord& record = **item;
@@ -141,25 +142,21 @@ int replay(const Options& options, const std::string& text) {
     ob::append_snapshot(out, engine.symbol_names()[i], *engine.find_book(symbol), options.depth);
   }
   ob::cli::flush_to_stdout(out);
-  std::fflush(stdout);
 
   if (options.stats) {
     const auto nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count();
-    const auto count = static_cast<long long>(commands.size());
-    std::fprintf(stderr,
-                 "obreplay: %lld commands, %llu events, %llu fills, %lld symbols in %.3f ms "
-                 "(%.0f ns/command, includes formatting)\n",
-                 count, static_cast<unsigned long long>(sink.events()),
-                 static_cast<unsigned long long>(sink.fills()),
-                 static_cast<long long>(engine.symbol_count()), static_cast<double>(nanos) / 1e6,
-                 count == 0 ? 0.0 : static_cast<double>(nanos) / static_cast<double>(count));
+    const std::size_t count = commands.size();
+    const double per_command =
+        count == 0 ? 0.0 : static_cast<double>(nanos) / static_cast<double>(count);
+    ob::cli::write(stderr, std::format("obreplay: {} commands, {} events, {} fills, {} symbols in "
+                                       "{:.3f} ms ({:.0f} ns/command, includes formatting)\n",
+                                       count, sink.events(), sink.fills(), engine.symbol_count(),
+                                       static_cast<double>(nanos) / 1e6, per_command));
   }
-  return 0;
+  return ob::cli::finish(0);
 }
 
-}  // namespace
-
-int main(int argc, char** argv) {
+int run(int argc, char** argv) {
   Options options;
   const std::span<char*> args(argv, static_cast<std::size_t>(argc));
   for (const char* raw : args.subspan(1)) {
@@ -174,8 +171,8 @@ int main(int argc, char** argv) {
     }
     const std::string_view value = option->value.value_or("");
     if (option->name == "help") {
-      std::fputs(kUsage.data(), stdout);
-      return 0;
+      ob::cli::write(stdout, kUsage);
+      return ob::cli::finish(0);
     }
     if (option->name == "events") {
       options.all_events = true;
@@ -219,7 +216,7 @@ int main(int argc, char** argv) {
 
   const std::optional<std::string> text = ob::cli::read_input(options.path);
   if (!text) {
-    std::fprintf(stderr, "obreplay: cannot read %s\n", options.path.c_str());
+    ob::cli::write(stderr, std::format("obreplay: cannot read {}\n", options.path));
     return 1;
   }
   switch (options.engine) {
@@ -231,4 +228,17 @@ int main(int argc, char** argv) {
       return replay<ob::ReferenceEngine>(options, *text);
   }
   return 2;
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+  try {
+    return run(argc, argv);
+  } catch (const std::exception& error) {
+    ob::cli::write(stderr, "obreplay: ");
+    ob::cli::write(stderr, error.what());
+    ob::cli::write(stderr, "\n");
+    return 1;
+  }
 }

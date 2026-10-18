@@ -128,8 +128,13 @@ class RecordParser {
  public:
   RecordParser(const Fields& fields, std::size_t line) noexcept : fields_(fields), line_(line) {}
 
-  [[nodiscard]] bool ok() const noexcept { return !error_; }
-  [[nodiscard]] CsvError error() const noexcept { return *error_; }
+  /// Field `column` (1-based); empty if the line is shorter.
+  [[nodiscard]] std::string_view field(std::size_t column) const noexcept {
+    return fields_[column];
+  }
+
+  [[nodiscard]] bool ok() const noexcept { return !error_.has_value(); }
+  [[nodiscard]] CsvError error() const noexcept { return error_.value_or(CsvError{}); }
 
   /// Fails unless `column` is empty.
   void require_empty(std::size_t column) noexcept {
@@ -168,7 +173,7 @@ class RecordParser {
   }
 
  private:
-  const Fields& fields_;
+  Fields fields_;
   std::size_t line_;
   std::optional<CsvError> error_;
 };
@@ -220,7 +225,7 @@ expected<CsvRecord, CsvError> parse_csv_record(std::string_view line,
   RecordParser parser(*fields, line_number);
   CsvRecord record;
 
-  const std::optional<CsvAction> action = parse_action((*fields)[kActionColumn]);
+  const std::optional<CsvAction> action = parse_action(parser.field(kActionColumn));
   if (!action) {
     return make_unexpected(CsvError{line_number, kActionColumn, CsvErrorCode::unknown_action});
   }
@@ -258,7 +263,7 @@ expected<CsvRecord, CsvError> parse_csv_record(std::string_view line,
         record.price = Price{parser.integer<std::int64_t>(kPriceColumn)};
       }
       record.qty = Qty{parser.integer<std::int64_t>(kQtyColumn)};
-      if (!(*fields)[kOwnerColumn].empty()) {
+      if (!parser.field(kOwnerColumn).empty()) {
         record.owner = OwnerId{parser.integer<std::uint32_t>(kOwnerColumn)};
       }
       break;

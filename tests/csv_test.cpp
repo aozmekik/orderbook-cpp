@@ -163,12 +163,17 @@ TEST(CsvTest, ReaderAcceptsAHeaderOnlyBeforeTheFirstRecord) {
 
 TEST(CsvTest, ReaderReportsLineNumbersAndContinues) {
   CsvReader reader("new,A,1,buy,limit,3,5\n\nnew,A,x,buy,limit,3,5\ncancel,A,1\n");
-  ASSERT_TRUE(reader.next()->has_value());
+  const auto first = reader.next();
+  ASSERT_TRUE(first.has_value() && first->has_value());
   EXPECT_EQ(reader.line(), 1U);
   const auto bad = reader.next();
-  ASSERT_FALSE(bad->has_value());
-  EXPECT_EQ(bad->error(), (CsvError{3, 3, CsvErrorCode::invalid_number}));
-  ASSERT_TRUE(reader.next()->has_value());
+  ASSERT_TRUE(bad.has_value());
+  if (bad.has_value()) {
+    ASSERT_FALSE(bad->has_value());
+    EXPECT_EQ(bad->error(), (CsvError{3, 3, CsvErrorCode::invalid_number}));
+  }
+  const auto last = reader.next();
+  ASSERT_TRUE(last.has_value() && last->has_value());
   EXPECT_EQ(reader.line(), 4U);
   EXPECT_EQ(reader.next(), std::nullopt);
 }

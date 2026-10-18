@@ -49,10 +49,10 @@ class LatencyHistogram {
       return 0;
     }
     // Rank of the wanted value, 1-based, rounding up (nearest-rank method).
-    const std::uint64_t rank =
-        numerator == 0 ? 1
-                       : (total_ / denominator) * numerator +
-                             ((total_ % denominator) * numerator + denominator - 1) / denominator;
+    const std::uint64_t whole = (total_ / denominator) * numerator;
+    const std::uint64_t part =
+        (((total_ % denominator) * numerator) + denominator - 1) / denominator;
+    const std::uint64_t rank = numerator == 0 ? 1 : whole + part;
     std::uint64_t seen = 0;
     for (std::size_t i = 0; i < counts_.size(); ++i) {
       seen += counts_[i];
@@ -71,7 +71,7 @@ class LatencyHistogram {
     }
     const auto shift = static_cast<unsigned>(std::bit_width(value)) - kSubBits;
     const std::uint64_t sub = (value >> shift) - kHalf;
-    return static_cast<std::size_t>(kExact + (shift - 1) * kHalf + sub);
+    return static_cast<std::size_t>(kExact + ((shift - 1) * kHalf) + sub);
   }
 
   /// Largest value that maps to bucket `index` (exposed for tests).
@@ -79,7 +79,7 @@ class LatencyHistogram {
     if (index < kExact) {
       return index;
     }
-    const std::uint64_t shift = (index - kExact) / kHalf + 1;
+    const std::uint64_t shift = ((index - kExact) / kHalf) + 1;
     const std::uint64_t sub = (index - kExact) % kHalf;
     const std::uint64_t lowest = (kHalf + sub) << shift;
     return lowest + ((std::uint64_t{1} << shift) - 1);
@@ -88,7 +88,7 @@ class LatencyHistogram {
  private:
   static constexpr std::uint64_t kExact = std::uint64_t{1} << kSubBits;
   static constexpr std::uint64_t kHalf = kExact / 2;
-  static constexpr std::size_t kBuckets = kExact + (64 - kSubBits) * kHalf;
+  static constexpr std::size_t kBuckets = kExact + ((64 - kSubBits) * kHalf);
 
   std::array<std::uint64_t, kBuckets> counts_{};
   std::uint64_t total_ = 0;

@@ -115,7 +115,8 @@ void run_against_model(std::uint32_t window, std::uint64_t seed, int operations)
   for (int op = 0; op < operations; ++op) {
     const std::uint64_t kind = rng.below(100);
     if (kind < 2) {
-      center += rng.between(-5 * static_cast<std::int64_t>(window), 5 * window);
+      center += rng.between(-5 * static_cast<std::int64_t>(window),
+                            5 * static_cast<std::int64_t>(window));
     } else if (kind < 55 || model.empty()) {
       LevelKey key = center + rng.between(-40, 40);
       if (kind < 4) {
@@ -151,6 +152,7 @@ void run_against_model(std::uint32_t window, std::uint64_t seed, int operations)
     ASSERT_EQ(index.check_invariants(), std::nullopt) << "op " << op;
     if (op % 32 == 0) {
       std::vector<LevelKey> expected;
+      expected.reserve(model.size());
       for (const auto& entry : model) {
         expected.push_back(entry.first);
       }

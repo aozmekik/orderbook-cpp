@@ -1,10 +1,12 @@
 include(GoogleTest)
+find_package(Threads REQUIRED)
 
 # --- Unit, semantic and differential tests ------------------------------------
 
 add_executable(
   orderbook_tests
   book_test.cpp
+  concurrency_test.cpp
   containers_test.cpp
   csv_test.cpp
   differential_test.cpp
@@ -13,7 +15,8 @@ add_executable(
   level_index_test.cpp
   vocabulary_test.cpp
   workload_test.cpp)
-target_link_libraries(orderbook_tests PRIVATE orderbook::orderbook GTest::gtest_main)
+target_link_libraries(orderbook_tests PRIVATE orderbook::orderbook GTest::gtest_main
+                                              Threads::Threads)
 target_include_directories(orderbook_tests PRIVATE ${PROJECT_SOURCE_DIR}/bench)
 ob_enable_warnings(orderbook_tests)
 gtest_discover_tests(orderbook_tests DISCOVERY_TIMEOUT 120 PROPERTIES TIMEOUT 900)

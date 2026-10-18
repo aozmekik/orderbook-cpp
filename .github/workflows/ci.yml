@@ -1,0 +1,134 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint (clang-format, clang-tidy)
+    # clang-tidy runs against the macOS SDK, the configuration the pinned
+    # tools are checked with locally (see CONTRIBUTING.md).
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Install the pinned clang-format and clang-tidy
+        run: python -m pip install -r requirements-dev.txt
+      - name: Install Ninja
+        run: command -v ninja || brew install ninja
+      - name: Check formatting
+        run: git ls-files -- '*.cpp' '*.hpp' | xargs clang-format --dry-run --Werror
+      - name: Configure (writes compile_commands.json)
+        run: cmake --preset dev
+      - name: clang-tidy
+        run: >-
+          run-clang-tidy.py -p build/dev -j "$(sysctl -n hw.ncpu)" -quiet
+          -clang-tidy-binary "$(command -v clang-tidy)"
+          -extra-arg="-isysroot$(xcrun --show-sdk-path)"
+          "$PWD/(src|apps|bench|tests|examples)/"
+
+  test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: "Ubuntu / GCC 14 / Debug", os: ubuntu-24.04, cxx: g++-14, preset: dev }
+          - { name: "Ubuntu / GCC 14 / Release", os: ubuntu-24.04, cxx: g++-14, preset: release }
+          - { name: "Ubuntu / GCC 14 / C++23", os: ubuntu-24.04, cxx: g++-14, preset: cxx23 }
+          - { name: "Ubuntu / Clang 18 / Debug", os: ubuntu-24.04, cxx: clang++-18, preset: dev }
+          - { name: "Ubuntu / Clang 18 / Release", os: ubuntu-24.04, cxx: clang++-18, preset: release }
+          - { name: "macOS / Apple Clang / Debug", os: macos-latest, cxx: clang++, preset: dev }
+          - { name: "macOS / Apple Clang / Release", os: macos-latest, cxx: clang++, preset: release }
+    env:
+      CXX: ${{ matrix.cxx }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Ninja
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo apt-get update && sudo apt-get install -y ninja-build
+          else
+            command -v ninja || brew install ninja
+          fi
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }} --parallel 4
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }} --parallel 4
+      - name: Install and build a downstream project with find_package
+        if: matrix.preset == 'release'
+        run: |
+          cmake --install build/release --prefix "$RUNNER_TEMP/prefix"
+          cmake -S tests/package -B build/package -G Ninja -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/prefix"
+          cmake --build build/package
+          ./build/package/consumer
+
+  sanitizers:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: "Ubuntu / Clang 18 / ASan + UBSan", os: ubuntu-24.04, cxx: clang++-18, preset: asan-ubsan }
+          - { name: "Ubuntu / Clang 18 / TSan", os: ubuntu-24.04, cxx: clang++-18, preset: tsan }
+          - { name: "macOS / Apple Clang / ASan + UBSan", os: macos-latest, cxx: clang++, preset: asan-ubsan }
+    env:
+      CXX: ${{ matrix.cxx }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Prepare the runner
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo apt-get update && sudo apt-get install -y ninja-build
+            # The Clang 18 sanitizer runtimes do not support the 32-bit mmap
+            # randomisation of recent kernels.
+            sudo sysctl -w vm.mmap_rnd_bits=28
+          else
+            command -v ninja || brew install ninja
+          fi
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }} --parallel 4
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }} --parallel 4
+
+  fuzz:
+    name: Fuzz (libFuzzer, 60 s per target)
+    runs-on: ubuntu-24.04
+    env:
+      CXX: clang++-18
+    steps:
+      - uses: actions/checkout@v7
+      - name: Prepare the runner
+        run: |
+          sudo apt-get update && sudo apt-get install -y ninja-build libclang-rt-18-dev
+          sudo sysctl -w vm.mmap_rnd_bits=28
+      - name: Configure
+        run: cmake --preset fuzz
+      - name: Build
+        run: cmake --build --preset fuzz --parallel 4
+      - name: Fuzz the CSV parser
+        run: |
+          mkdir -p "$RUNNER_TEMP/corpus-csv"
+          build/fuzz/fuzz/fuzz_csv -max_total_time=60 "$RUNNER_TEMP/corpus-csv" fuzz/corpus
+      - name: Fuzz the engines against each other
+        run: |
+          mkdir -p "$RUNNER_TEMP/corpus-engine"
+          build/fuzz/fuzz/fuzz_engine -max_total_time=60 "$RUNNER_TEMP/corpus-engine" fuzz/corpus

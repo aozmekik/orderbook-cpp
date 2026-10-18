@@ -1,0 +1,12 @@
+# FetchContent pins (GoogleTest, Google Benchmark) are not supported by
+# Dependabot; they are bumped by hand (see CONTRIBUTING.md).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly

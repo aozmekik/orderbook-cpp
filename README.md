@@ -246,23 +246,23 @@ flowchart LR
 - **Sanitizers:** the whole suite also runs under ASan + UBSan and TSan; the
   concurrency tests run engines on several threads at once.
 
-Measured on 2026-10-18 at commit `f8aa1a6` on an Apple M1 Pro (16 GB, macOS
-26.6.2):
+Measured on 2026-10-18 on the code of commit `f8aa1a6` (the commits after it
+change only documentation), on an Apple M1 Pro (16 GB, macOS 26.6.2):
 
 | What | Result | Command and toolchain |
 | --- | --- | --- |
 | Test suite | 261 tests pass: 231 GoogleTest cases, 28 CLI tests, 2 example programs; 262 in release with the benchmark smoke test | `ctest --preset dev`, and the `release`, `cxx23`, `asan-ubsan` and `tsan` presets; Apple clang 21.0.0 |
 | Long differential run | 24 configurations x 1,000,000 requests, identical events | `OB_DIFF_OPS=1000000 ./build/release/tests/orderbook_tests --gtest_filter='RandomStreams/*'` |
-| Coverage of `include/` and `src/` | 96.6% of 2,156 lines, 99.6% of 272 functions, 92.8% of 981 branches | `scripts/coverage.sh /opt/homebrew/opt/llvm/bin`; Homebrew LLVM 23.1.3 (see note below) |
-| `fuzz_csv` | 2,091,081 inputs in 61 s, no failure | `-max_total_time=60` on `fuzz/corpus/csv`; Homebrew clang 23.1.3, ASan + UBSan, assertions on |
-| `fuzz_engine` | 1,882,937 inputs in 121 s, no failure | `-max_total_time=120` on `fuzz/corpus/engine`; same |
+| Coverage of `include/` and `src/` | 96.6% of 2,156 lines, 99.6% of 272 functions, 92.7% of 981 branches | `scripts/coverage.sh /opt/homebrew/opt/llvm/bin` in a fresh clone; Homebrew LLVM 23.1.3 (see note below) |
+| `fuzz_csv` | 2,372,494 inputs in 61 s, no failure | `-max_total_time=60` on `fuzz/corpus/csv`; Homebrew clang 23.1.3, ASan + UBSan, assertions on |
+| `fuzz_engine` | 2,167,318 inputs in 121 s, no failure | `-max_total_time=120` on `fuzz/corpus/engine`; same |
 | Cross-toolchain determinism | identical SHA-256 of `obgen` output (1M commands, 30,730,531 bytes) and of `obreplay --events` on it, for all three engines | Apple clang 21 / libc++ vs. Homebrew GCC 14.2 / libstdc++ release builds |
 | GCC 14 | library, tools and examples build with `-Werror`; tests and benchmarks pass `-fsyntax-only` with the same warnings | Homebrew GCC 14.2 against the macOS SDK (GoogleTest does not link there, so the tests were not run with GCC) |
 
-Coverage note: an earlier run of the same command gave 92.7% of branches;
-the cause of that 0.1-point spread was not found. `llvm-cov` also warns that
-165 functions have mismatched profile data across the six instrumented
-binaries; the figures are what it reports.
+Coverage note: three runs of the same command gave 92.66% to 92.76% of
+branches (lines and functions did not change); the cause of that spread was
+not found. `llvm-cov` also warns that 165 functions have mismatched profile
+data across the six instrumented binaries; the figures are what it reports.
 
 ## Benchmarks
 

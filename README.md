@@ -243,8 +243,9 @@ flowchart LR
 - **Fuzzing:** `fuzz_csv` (parser round trips) and `fuzz_engine` (the three
   books against each other on arbitrary order streams, invariants checked
   after every command), with ASan, UBSan and assertions on.
-- **Sanitizers:** the whole suite also runs under ASan + UBSan and TSan; the
-  concurrency tests run engines on several threads at once.
+- **Sanitizers:** the whole suite also runs under ASan + UBSan, and under TSan
+  except the allocation test, whose replacement `operator new` clashes with
+  the TSan runtime; the concurrency tests run engines on several threads at once.
 
 Measured on 2026-10-18 on the code of commit `f8aa1a6` (the commits after it
 change only documentation), on an Apple M1 Pro (16 GB, macOS 26.6.2):

@@ -64,11 +64,18 @@ template <class Int>
   return value;
 }
 
+/// Closes a `FILE*` owned by a `std::unique_ptr`. A function-pointer deleter
+/// (`decltype(&std::fclose)`) drops glibc's attributes on `fclose`, which GCC
+/// reports under -Wignored-attributes.
+struct FileCloser {
+  void operator()(std::FILE* file) const noexcept { static_cast<void>(std::fclose(file)); }
+};
+
 /// Reads a whole file, or standard input for "-". Pipes and other
 /// non-regular files work; a directory, a file that cannot be opened and a
 /// read error are reported with a short reason.
 [[nodiscard]] inline ob::expected<std::string, std::string> read_input(const std::string& path) {
-  std::unique_ptr<std::FILE, decltype(&std::fclose)> owned(nullptr, &std::fclose);
+  std::unique_ptr<std::FILE, FileCloser> owned;
   std::FILE* file = stdin;
   if (path != "-") {
     std::error_code status_error;

@@ -22,12 +22,18 @@ ob_enable_warnings(orderbook_tests)
 ob_enable_invariant_checks(orderbook_tests)
 gtest_discover_tests(orderbook_tests DISCOVERY_TIMEOUT 120 PROPERTIES TIMEOUT 900)
 
-# Replaces the global allocation functions, so it gets its own binary.
-add_executable(orderbook_allocation_test allocation_test.cpp)
-target_link_libraries(orderbook_allocation_test PRIVATE orderbook::orderbook GTest::gtest_main)
-ob_enable_warnings(orderbook_allocation_test)
-ob_enable_invariant_checks(orderbook_allocation_test)
-gtest_discover_tests(orderbook_allocation_test DISCOVERY_TIMEOUT 120 PROPERTIES TIMEOUT 900)
+# Replaces the global allocation functions, so it gets its own binary. The
+# ThreadSanitizer runtime defines the same functions as strong symbols, so the
+# test cannot link there; every other build, the ASan/UBSan one included, runs it.
+if(CMAKE_CXX_FLAGS MATCHES "-fsanitize=([^ ]*,)?thread")
+  message(STATUS "ThreadSanitizer build: skipping orderbook_allocation_test")
+else()
+  add_executable(orderbook_allocation_test allocation_test.cpp)
+  target_link_libraries(orderbook_allocation_test PRIVATE orderbook::orderbook GTest::gtest_main)
+  ob_enable_warnings(orderbook_allocation_test)
+  ob_enable_invariant_checks(orderbook_allocation_test)
+  gtest_discover_tests(orderbook_allocation_test DISCOVERY_TIMEOUT 120 PROPERTIES TIMEOUT 900)
+endif()
 
 # --- Command-line tests ------------------------------------------------------
 # Golden files: every engine must print exactly the same bytes for the same input.

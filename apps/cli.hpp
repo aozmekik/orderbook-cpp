@@ -68,7 +68,9 @@ template <class Int>
 /// (`decltype(&std::fclose)`) drops glibc's attributes on `fclose`, which GCC
 /// reports under -Wignored-attributes.
 struct FileCloser {
-  void operator()(std::FILE* file) const noexcept { static_cast<void>(std::fclose(file)); }
+  void operator()(std::FILE* file) const noexcept {
+    static_cast<void>(std::fclose(file));  // NOLINT(cppcoreguidelines-owning-memory)
+  }
 };
 
 /// Reads a whole file, or standard input for "-". Pipes and other

@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <span>
 #include <string>
@@ -43,11 +44,12 @@ void append_snapshot(std::string& out, std::string_view symbol, std::span<const 
                      std::span<const LevelView> asks);
 
 /// Appends a snapshot of up to `max_levels` levels per side of `book`.
+/// Memory is proportional to the levels shown, not to `max_levels`.
 template <OrderBookLike Book>
 void append_snapshot(std::string& out, std::string_view symbol, const Book& book,
                      std::size_t max_levels) {
-  std::vector<LevelView> bids(max_levels);
-  std::vector<LevelView> asks(max_levels);
+  std::vector<LevelView> bids(std::min(max_levels, book.level_count(Side::buy)));
+  std::vector<LevelView> asks(std::min(max_levels, book.level_count(Side::sell)));
   bids.resize(book.depth(Side::buy, bids));
   asks.resize(book.depth(Side::sell, asks));
   append_snapshot(out, symbol, bids, asks);

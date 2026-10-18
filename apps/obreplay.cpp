@@ -3,6 +3,8 @@
 // the trades and the final book. Standard output is deterministic; timing
 // (with --stats) goes to standard error.
 
+#include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -22,6 +24,7 @@
 #include <orderbook/csv.hpp>
 #include <orderbook/engine.hpp>
 #include <orderbook/events.hpp>
+#include <orderbook/expected.hpp>
 #include <orderbook/format.hpp>
 #include <orderbook/types.hpp>
 
@@ -169,6 +172,15 @@ int run(int argc, char** argv) {
       options.path = arg;
       continue;
     }
+    constexpr std::array<std::string_view, 3> kFlags{"help", "events", "stats"};
+    constexpr std::array<std::string_view, 4> kValued{"engine", "stp", "depth", "ladder-ticks"};
+    const bool is_flag = std::ranges::find(kFlags, option->name) != kFlags.end();
+    if (!is_flag && std::ranges::find(kValued, option->name) == kValued.end()) {
+      return usage_error("unknown option --" + std::string(option->name));
+    }
+    if (const std::optional<std::string> error = ob::cli::shape_error(*option, !is_flag)) {
+      return usage_error(*error);
+    }
     const std::string_view value = option->value.value_or("");
     if (option->name == "help") {
       ob::cli::write(stdout, kUsage);
@@ -202,7 +214,7 @@ int run(int argc, char** argv) {
       options.depth = *depth;
     } else if (option->name == "ladder-ticks") {
       const std::optional<std::uint32_t> ticks = ob::cli::parse_number<std::uint32_t>(value);
-      if (!ticks) {
+      if (!ticks || *ticks == 0) {
         return usage_error("--ladder-ticks needs a positive integer");
       }
       options.ladder_ticks = *ticks;
@@ -214,9 +226,10 @@ int run(int argc, char** argv) {
     return usage_error("missing input file");
   }
 
-  const std::optional<std::string> text = ob::cli::read_input(options.path);
+  const ob::expected<std::string, std::string> text = ob::cli::read_input(options.path);
   if (!text) {
-    ob::cli::write(stderr, std::format("obreplay: cannot read {}\n", options.path));
+    ob::cli::write(stderr,
+                   std::format("obreplay: cannot read {}: {}\n", options.path, text.error()));
     return 1;
   }
   switch (options.engine) {

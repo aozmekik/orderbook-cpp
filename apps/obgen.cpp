@@ -2,6 +2,8 @@
 // obgen: writes a synthetic order stream as CSV to standard output and a
 // summary of what the stream does to standard error.
 
+#include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -81,6 +83,63 @@ void print_summary(const ob::workload::Workload& workload) {
                   s.live_at_end));
 }
 
+/// Sets the generator setting named by `--name=value`; returns false if
+/// `value` is not valid for it (or `name` is not a setting).
+bool set_option(ob::workload::Config& config, std::string_view name, std::string_view value) {
+  const auto u64 = ob::cli::parse_number<std::uint64_t>(value);
+  const auto u32 = ob::cli::parse_number<std::uint32_t>(value);
+  const auto i64 = ob::cli::parse_number<std::int64_t>(value);
+  const auto set = [](auto& field, const auto& parsed) {
+    if (parsed) {
+      field = *parsed;
+    }
+    return parsed.has_value();
+  };
+  if (name == "commands") {
+    return set(config.commands, u64);
+  }
+  if (name == "symbols") {
+    return set(config.symbols, u32) && config.symbols > 0;
+  }
+  if (name == "seed") {
+    return set(config.seed, u64);
+  }
+  if (name == "start-price") {
+    return set(config.start_price, i64);
+  }
+  if (name == "max-distance") {
+    return set(config.max_distance, u32) && config.max_distance > 0;
+  }
+  if (name == "target-orders") {
+    return set(config.target_orders, u32) && config.target_orders > 0;
+  }
+  if (name == "owners") {
+    return set(config.owners, u32) && config.owners > 0;
+  }
+  if (name == "passive") {
+    return set(config.mix.passive, u32);
+  }
+  if (name == "cancel") {
+    return set(config.mix.cancel, u32);
+  }
+  if (name == "modify") {
+    return set(config.mix.modify, u32);
+  }
+  if (name == "aggressive") {
+    return set(config.mix.aggressive, u32);
+  }
+  if (name == "post-only") {
+    return set(config.post_only_percent, u32) && config.post_only_percent <= 100;
+  }
+  if (name == "market") {
+    return set(config.market_percent, u32) && config.market_percent <= 100;
+  }
+  if (name == "fok") {
+    return set(config.fok_percent, u32) && config.fok_percent <= 100;
+  }
+  return false;
+}
+
 int run(int argc, char** argv) {
   ob::workload::Config config;
   bool quiet = false;
@@ -90,9 +149,16 @@ int run(int argc, char** argv) {
     if (!option) {
       return usage_error("unexpected argument " + std::string(raw));
     }
-    const bool is_flag = option->name == "help" || option->name == "quiet";
-    if (is_flag && option->value) {
-      return usage_error("--" + std::string(option->name) + " takes no value");
+    constexpr std::array<std::string_view, 2> kFlags{"help", "quiet"};
+    constexpr std::array<std::string_view, 14> kValued{
+        "commands", "symbols", "seed",   "start-price", "max-distance", "target-orders", "owners",
+        "passive",  "cancel",  "modify", "aggressive",  "post-only",    "market",        "fok"};
+    const bool is_flag = std::ranges::find(kFlags, option->name) != kFlags.end();
+    if (!is_flag && std::ranges::find(kValued, option->name) == kValued.end()) {
+      return usage_error("unknown option --" + std::string(option->name));
+    }
+    if (const std::optional<std::string> error = ob::cli::shape_error(*option, !is_flag)) {
+      return usage_error(*error);
     }
     if (option->name == "help") {
       ob::cli::write(stdout, kUsage);
@@ -102,55 +168,8 @@ int run(int argc, char** argv) {
       quiet = true;
       continue;
     }
-    if (!option->value) {
-      return usage_error("--" + std::string(option->name) + " needs a value (--" +
-                         std::string(option->name) + "=N)");
-    }
-    const std::string_view value = *option->value;
-    const auto u64 = ob::cli::parse_number<std::uint64_t>(value);
-    const auto u32 = ob::cli::parse_number<std::uint32_t>(value);
-    const auto i64 = ob::cli::parse_number<std::int64_t>(value);
-    const auto set = [&](auto& field, const auto& parsed) {
-      if (parsed) {
-        field = *parsed;
-      }
-      return parsed.has_value();
-    };
-    bool ok = false;
-    const std::string_view name = option->name;
-    if (name == "commands") {
-      ok = set(config.commands, u64);
-    } else if (name == "symbols") {
-      ok = set(config.symbols, u32) && config.symbols > 0;
-    } else if (name == "seed") {
-      ok = set(config.seed, u64);
-    } else if (name == "start-price") {
-      ok = set(config.start_price, i64);
-    } else if (name == "max-distance") {
-      ok = set(config.max_distance, u32) && config.max_distance > 0;
-    } else if (name == "target-orders") {
-      ok = set(config.target_orders, u32) && config.target_orders > 0;
-    } else if (name == "owners") {
-      ok = set(config.owners, u32) && config.owners > 0;
-    } else if (name == "passive") {
-      ok = set(config.mix.passive, u32);
-    } else if (name == "cancel") {
-      ok = set(config.mix.cancel, u32);
-    } else if (name == "modify") {
-      ok = set(config.mix.modify, u32);
-    } else if (name == "aggressive") {
-      ok = set(config.mix.aggressive, u32);
-    } else if (name == "post-only") {
-      ok = set(config.post_only_percent, u32) && config.post_only_percent <= 100;
-    } else if (name == "market") {
-      ok = set(config.market_percent, u32) && config.market_percent <= 100;
-    } else if (name == "fok") {
-      ok = set(config.fok_percent, u32) && config.fok_percent <= 100;
-    } else {
-      return usage_error("unknown option --" + std::string(name));
-    }
-    if (!ok) {
-      return usage_error("invalid value for --" + std::string(name));
+    if (!set_option(config, option->name, option->value.value_or(""))) {
+      return usage_error("invalid value for --" + std::string(option->name));
     }
   }
   if (const std::optional<std::string> error = ob::workload::config_error(config)) {

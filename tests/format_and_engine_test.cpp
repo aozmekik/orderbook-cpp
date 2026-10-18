@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Text rendering, and the multi-symbol engine.
 
+#include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <string>
 #include <vector>
@@ -78,6 +80,10 @@ TEST(FormatTest, SnapshotIsALadderWithAsksOnTop) {
             "snapshot AAPL bids=1 asks=1\n"
             "level AAPL ask price=101 qty=8 orders=2\n"
             "level AAPL bid price=99 qty=5 orders=1\n");
+  // The level limit bounds the output, not the memory used to build it.
+  out.clear();
+  append_snapshot(out, "AAPL", book, std::numeric_limits<std::size_t>::max());
+  EXPECT_EQ(out.substr(0, out.find('\n')), "snapshot AAPL bids=2 asks=2");
 }
 
 TEST(EngineTest, RegistersSymbolsWithDenseIds) {

@@ -2,16 +2,19 @@
 // Small helpers shared by the command-line tools.
 #pragma once
 
+#include <array>
+#include <cerrno>
 #include <charconv>
+#include <cstddef>
 #include <cstdio>
-#include <fstream>
-#include <iostream>
-#include <iterator>
+#include <filesystem>
+#include <memory>
 #include <optional>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <system_error>
+
+#include <orderbook/expected.hpp>
 
 namespace ob::cli {
 
@@ -20,6 +23,20 @@ struct Option {
   std::string_view name;
   std::optional<std::string_view> value;
 };
+
+/// Why `option` is malformed for a flag (`takes_value` false, `--name`) or
+/// a valued option (`--name=value`), or std::nullopt if it is well formed.
+[[nodiscard]] inline std::optional<std::string> shape_error(const Option& option,
+                                                            bool takes_value) {
+  const std::string name(option.name);
+  if (takes_value && !option.value) {
+    return "--" + name + " needs a value (--" + name + "=...)";
+  }
+  if (!takes_value && option.value) {
+    return "--" + name + " takes no value";
+  }
+  return std::nullopt;
+}
 
 /// Splits `--name=value`; returns std::nullopt for arguments that are not options.
 [[nodiscard]] inline std::optional<Option> parse_option(std::string_view arg) {
@@ -47,18 +64,32 @@ template <class Int>
   return value;
 }
 
-/// Reads a whole file, or standard input for "-".
-[[nodiscard]] inline std::optional<std::string> read_input(const std::string& path) {
-  if (path == "-") {
-    std::ostringstream buffer;
-    buffer << std::cin.rdbuf();
-    return std::move(buffer).str();
+/// Reads a whole file, or standard input for "-". Pipes and other
+/// non-regular files work; a directory, a file that cannot be opened and a
+/// read error are reported with a short reason.
+[[nodiscard]] inline ob::expected<std::string, std::string> read_input(const std::string& path) {
+  std::unique_ptr<std::FILE, decltype(&std::fclose)> owned(nullptr, &std::fclose);
+  std::FILE* file = stdin;
+  if (path != "-") {
+    std::error_code status_error;
+    if (std::filesystem::is_directory(path, status_error)) {
+      return ob::make_unexpected(std::string("is a directory"));
+    }
+    owned.reset(std::fopen(path.c_str(), "rb"));  // NOLINT(cppcoreguidelines-owning-memory)
+    if (!owned) {
+      return ob::make_unexpected(std::generic_category().message(errno));
+    }
+    file = owned.get();
   }
-  std::ifstream file(path, std::ios::binary);
-  if (!file) {
-    return std::nullopt;
+  std::string text;
+  std::array<char, std::size_t{1} << 16U> buffer{};
+  for (std::size_t got = 0; (got = std::fread(buffer.data(), 1, buffer.size(), file)) > 0;) {
+    text.append(buffer.data(), got);
   }
-  return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+  if (std::ferror(file) != 0) {
+    return ob::make_unexpected(std::string("read error"));
+  }
+  return text;
 }
 
 /// Writes `text` to `stream`. Errors are detected later with `finish`.

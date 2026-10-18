@@ -313,7 +313,7 @@ BENCHMARK(BM_WorkloadLatency<Reference, Flow::near_touch>)
     ->Name("Latency/Reference")
     ->Iterations(3)
     ->Unit(benchmark::kMillisecond);
-BENCHMARK(BM_ClockResolution);
+BENCHMARK(BM_ClockResolution)->Name("ClockResolution");
 
 }  // namespace
 

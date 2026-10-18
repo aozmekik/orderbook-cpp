@@ -127,4 +127,5 @@ if(OB_INSTALL)
   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/orderbookConfig.cmake
                 ${CMAKE_CURRENT_BINARY_DIR}/orderbookConfigVersion.cmake
           DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/orderbook)
+  install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/orderbook)
 endif()

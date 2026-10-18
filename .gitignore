@@ -26,9 +26,6 @@ slow-unit-*
 *.gcno
 *.gcov
 
-# Benchmark scratch output
-/bench/results/*.json
-
 # Editors and OS
 .idea/
 .vscode/

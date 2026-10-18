@@ -21,6 +21,13 @@
 namespace ob {
 namespace {
 
+// This project's unoptimised builds re-check every invariant after every
+// request (CMakeLists.txt, ob_enable_invariant_checks); the library default
+// is off.
+#if !defined(NDEBUG) && !defined(__OPTIMIZE__)
+static_assert(OB_ENABLE_INVARIANT_CHECKS == 1);
+#endif
+
 using test::Harness;
 using test::kBuy;
 using test::kSell;

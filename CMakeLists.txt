@@ -30,6 +30,16 @@ include(GNUInstallDirs)
 # consumer's CMAKE_MODULE_PATH can never shadow them.
 include(${PROJECT_SOURCE_DIR}/cmake/OrderbookWarnings.cmake)
 
+# The project's own tests, tools and examples re-check every invariant of a
+# book after each request in every build type except the optimised ones
+# (Debug, or none). Consumers of the library opt in by defining
+# OB_ENABLE_INVARIANT_CHECKS=1 themselves.
+function(ob_enable_invariant_checks target)
+  target_compile_definitions(
+    ${target}
+    PRIVATE $<$<NOT:$<CONFIG:Release,RelWithDebInfo,MinSizeRel>>:OB_ENABLE_INVARIANT_CHECKS=1>)
+endfunction()
+
 # --- Library -----------------------------------------------------------------
 
 add_library(

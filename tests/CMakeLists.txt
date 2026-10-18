@@ -19,12 +19,14 @@ target_link_libraries(orderbook_tests PRIVATE orderbook::orderbook GTest::gtest_
                                               Threads::Threads)
 target_include_directories(orderbook_tests PRIVATE ${PROJECT_SOURCE_DIR}/bench)
 ob_enable_warnings(orderbook_tests)
+ob_enable_invariant_checks(orderbook_tests)
 gtest_discover_tests(orderbook_tests DISCOVERY_TIMEOUT 120 PROPERTIES TIMEOUT 900)
 
 # Replaces the global allocation functions, so it gets its own binary.
 add_executable(orderbook_allocation_test allocation_test.cpp)
 target_link_libraries(orderbook_allocation_test PRIVATE orderbook::orderbook GTest::gtest_main)
 ob_enable_warnings(orderbook_allocation_test)
+ob_enable_invariant_checks(orderbook_allocation_test)
 gtest_discover_tests(orderbook_allocation_test DISCOVERY_TIMEOUT 120 PROPERTIES TIMEOUT 900)
 
 # --- Command-line golden tests -----------------------------------------------

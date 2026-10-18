@@ -27,14 +27,12 @@
 #include <orderbook/types.hpp>
 
 /// When non-zero, every mutating call on a book re-checks all of its
-/// invariants and aborts on a violation. Defaults to on unless NDEBUG is
-/// defined (like `assert`). The check is O(orders + levels) per call.
+/// invariants and aborts on a violation. The check is O(orders + levels +
+/// window / 64) per call, so it is off unless defined to 1. This project's
+/// own tests, tools and examples define it in Debug builds; define it in
+/// every translation unit of a program, or in none.
 #ifndef OB_ENABLE_INVARIANT_CHECKS
-#ifdef NDEBUG
 #define OB_ENABLE_INVARIANT_CHECKS 0
-#else
-#define OB_ENABLE_INVARIANT_CHECKS 1
-#endif
 #endif
 
 namespace ob {

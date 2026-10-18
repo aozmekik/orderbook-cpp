@@ -2,6 +2,7 @@ foreach(example IN ITEMS basic market_data)
   add_executable(example_${example} ${example}.cpp)
   target_link_libraries(example_${example} PRIVATE orderbook::orderbook)
   ob_enable_warnings(example_${example})
+  ob_enable_invariant_checks(example_${example})
 endforeach()
 
 if(OB_BUILD_TESTS)

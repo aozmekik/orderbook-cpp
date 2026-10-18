@@ -127,7 +127,7 @@ and review the diff line by line.
 ## Updating dependencies
 
 Dependabot updates the GitHub Actions and the pinned Python tools. It cannot
-update the `FetchContent` pins in `cmake/Dependencies.cmake`; to bump
+update the `FetchContent` pins in `cmake/OrderbookDependencies.cmake`; to bump
 GoogleTest or Google Benchmark, change the URL, then the `URL_HASH` to the
 SHA-256 of the new archive (`curl -sL <url> | shasum -a 256`).
 

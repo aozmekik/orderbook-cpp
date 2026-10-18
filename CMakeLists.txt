@@ -7,8 +7,6 @@ project(
   HOMEPAGE_URL "https://github.com/aozmekik/orderbook-cpp"
   LANGUAGES CXX)
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-
 option(OB_BUILD_TESTS "Build the unit and differential tests" ${PROJECT_IS_TOP_LEVEL})
 option(OB_BUILD_APPS "Build the obreplay and obgen command-line tools" ${PROJECT_IS_TOP_LEVEL})
 option(OB_BUILD_EXAMPLES "Build the examples" ${PROJECT_IS_TOP_LEVEL})
@@ -27,7 +25,9 @@ if(PROJECT_IS_TOP_LEVEL)
 endif()
 
 include(GNUInstallDirs)
-include(Warnings)
+# Project modules are included by path, so that a module of the same name on a
+# consumer's CMAKE_MODULE_PATH can never shadow them.
+include(${PROJECT_SOURCE_DIR}/cmake/OrderbookWarnings.cmake)
 
 # --- Library -----------------------------------------------------------------
 
@@ -57,7 +57,7 @@ if(OB_BUILD_EXAMPLES)
 endif()
 
 if(OB_BUILD_TESTS OR OB_BUILD_BENCHMARKS)
-  include(Dependencies)
+  include(${PROJECT_SOURCE_DIR}/cmake/OrderbookDependencies.cmake)
 endif()
 
 if(OB_BUILD_TESTS)

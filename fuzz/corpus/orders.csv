@@ -1,0 +1,27 @@
+# A small order stream for obreplay. Columns are described in docs/csv-format.md.
+action,symbol,id,side,type,price,qty,owner
+# An AAPL book: three asks, two bids.
+new,AAPL,1,sell,limit,10060,300,1
+new,AAPL,2,sell,limit,10055,200,2
+new,AAPL,3,sell,limit,10055,100,3
+new,AAPL,4,buy,limit,10045,400,4
+new,AAPL,5,buy,limit,10040,500,5
+# Crosses the spread: fills order 2, then order 3 (time priority), rests 50.
+new,AAPL,6,buy,limit,10055,350,6
+# A smaller size keeps time priority; a new price loses it.
+modify,AAPL,4,,,10045,250
+modify,AAPL,5,,,10050,500
+# A market sell sweeps the bids, best price first.
+new,AAPL,7,sell,market,,600,7
+# IOC: takes what it can at or below its limit, cancels the rest.
+new,AAPL,8,buy,ioc,10060,400,8
+# A fill-or-kill that cannot fill completely is killed; the book is untouched.
+new,AAPL,9,sell,fok,10040,10000,9
+# A post-only order that would take liquidity is rejected.
+new,AAPL,10,sell,post_only,10040,100,1
+new,AAPL,11,sell,post_only,10065,100,1
+# A second symbol has its own book; order ids only need to be unique per symbol.
+new,MSFT,1,buy,limit,41000,50,1
+new,MSFT,2,sell,limit,41010,50,2
+cancel,AAPL,11
+cancel,AAPL,99

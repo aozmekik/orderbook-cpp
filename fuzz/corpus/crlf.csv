@@ -1,0 +1,7 @@
+action,symbol,id,side,type,price,qty,owner
+new,B,1,sell,fok,5,10,2
+new,B,2,buy,post_only,5,1,2
+modify,B,9,,,5,0
+# comment
+
+new,B,1,buy,ioc,6,3,

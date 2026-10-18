@@ -304,7 +304,7 @@ TEST_P(DifferentialTest, OptimisedBooksAgreeWithTheReference) {
         << "ladder, op " << op << ": " << describe(command);
     ASSERT_EQ(map_events.events, expected.events) << "map, op " << op << ": " << describe(command);
     for (const Event& event : expected.events) {
-      fills += std::holds_alternative<Fill>(event) ? 1 : 0;
+      fills += std::holds_alternative<Fill>(event) ? 1U : 0U;
     }
     if constexpr (!kBooksSelfCheck) {
       ASSERT_EQ(ladder.check_invariants(), std::nullopt) << "op " << op;

@@ -62,7 +62,7 @@ TEST(LatencyHistogramTest, QuantilesMatchSortedDataWithinTheBucketError) {
     h->record(v);
   }
   std::ranges::sort(values);
-  for (const auto [numerator, denominator] :
+  for (const auto& [numerator, denominator] :
        {std::pair<std::uint64_t, std::uint64_t>{1, 2}, {9, 10}, {99, 100}, {999, 1000}}) {
     const std::size_t rank = ((values.size() * numerator) + denominator - 1) / denominator;
     const std::uint64_t exact = values[rank - 1];

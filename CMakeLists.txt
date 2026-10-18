@@ -14,6 +14,7 @@ option(OB_BUILD_BENCHMARKS "Build the Google Benchmark suite" ${PROJECT_IS_TOP_L
 option(OB_BUILD_FUZZERS "Build the libFuzzer targets (requires Clang with libFuzzer)" OFF)
 option(OB_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ${PROJECT_IS_TOP_LEVEL})
 option(OB_INSTALL "Generate the install and package-config rules" ${PROJECT_IS_TOP_LEVEL})
+option(OB_USE_STD_EXPECTED "Make ob::expected an alias of std::expected (requires C++23)" OFF)
 
 if(PROJECT_IS_TOP_LEVEL)
   if(NOT DEFINED CMAKE_CXX_STANDARD)
@@ -39,10 +40,25 @@ add_library(
   src/workload.cpp)
 add_library(orderbook::orderbook ALIAS orderbook)
 
+# Settings that change types in the library's interface are recorded in a
+# generated header, so that every translation unit agrees with the library.
+if(OB_USE_STD_EXPECTED)
+  set(OB_USE_STD_EXPECTED_VALUE 1)
+else()
+  set(OB_USE_STD_EXPECTED_VALUE 0)
+endif()
+configure_file(include/orderbook/config.hpp.in
+               ${PROJECT_BINARY_DIR}/include/orderbook/config.hpp @ONLY)
+
 target_include_directories(
   orderbook PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+                   $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
                    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-target_compile_features(orderbook PUBLIC cxx_std_20)
+if(OB_USE_STD_EXPECTED)
+  target_compile_features(orderbook PUBLIC cxx_std_23)
+else()
+  target_compile_features(orderbook PUBLIC cxx_std_20)
+endif()
 set_target_properties(orderbook PROPERTIES VERSION ${PROJECT_VERSION} EXPORT_NAME orderbook)
 ob_enable_warnings(orderbook)
 
@@ -84,7 +100,9 @@ if(OB_INSTALL)
   include(CMakePackageConfigHelpers)
 
   install(TARGETS orderbook EXPORT orderbookTargets)
-  install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+  install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} PATTERN "*.in" EXCLUDE)
+  install(FILES ${PROJECT_BINARY_DIR}/include/orderbook/config.hpp
+          DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/orderbook)
   install(
     EXPORT orderbookTargets
     NAMESPACE orderbook::

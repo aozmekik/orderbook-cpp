@@ -111,7 +111,7 @@ TEST(ExpectedTest, FallbackHoldsAValueOrAnError) {
 }
 
 TEST(ExpectedTest, AliasMatchesTheStandardLibrary) {
-#if OB_HAS_STD_EXPECTED
+#if OB_USE_STD_EXPECTED
   static_assert(std::is_same_v<expected<int, char>, std::expected<int, char>>);
 #else
   static_assert(std::is_same_v<expected<int, char>, detail::ExpectedFallback<int, char>>);

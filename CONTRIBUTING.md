@@ -32,7 +32,7 @@ cmake --workflow --preset release  # configure, build and test the optimised bui
 | --- | --- |
 | `dev` | Debug build; every book re-checks all of its invariants after every request |
 | `release` | `-O3 -DNDEBUG`; used for benchmarks; also runs a benchmark smoke test |
-| `cxx23` | Debug build in C++23 mode, which switches `ob::expected` to `std::expected` |
+| `cxx23` | Debug build in C++23 with `OB_USE_STD_EXPECTED=ON`, so `ob::expected` is `std::expected` |
 | `asan-ubsan` | AddressSanitizer and UndefinedBehaviorSanitizer |
 | `tsan` | ThreadSanitizer (the concurrency tests run engines on several threads) |
 | `fuzz` | libFuzzer targets; needs `CXX` set to a Clang with libFuzzer |

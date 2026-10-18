@@ -1,9 +1,16 @@
 // SPDX-License-Identifier: MIT
 /// @file
-/// `ob::expected<T, E>`: `std::expected` when the standard library provides it
-/// (C++23, detected with the `__cpp_lib_expected` feature-test macro), and a
-/// small fallback with the same spelling for the subset this library uses
-/// otherwise. Code that sticks to `has_value()`, `operator bool`, `operator*`,
+/// `ob::expected<T, E>`: the result type of the functions that can fail
+/// without throwing (the CSV parser).
+///
+/// It is the library's own small fallback by default, and `std::expected`
+/// when the library is configured with `OB_USE_STD_EXPECTED=ON` (C++23). The
+/// choice is recorded in the generated `<orderbook/config.hpp>` when the
+/// library is built, never made by a feature test in the including
+/// translation unit: compiled functions return this type by value, and
+/// return types are not part of a mangled name, so a C++23 program would
+/// otherwise link against a C++20-built library and read one type as the
+/// other. Code that sticks to `has_value()`, `operator bool`, `operator*`,
 /// `operator->` and `error()` compiles unchanged against either.
 
 #pragma once
@@ -11,14 +18,16 @@
 #include <type_traits>
 #include <utility>
 #include <variant>
-#include <version>
 
-#if defined(__cpp_lib_expected) && __cpp_lib_expected >= 202202L
+#include <orderbook/config.hpp>
+
+#if OB_USE_STD_EXPECTED
+#include <version>
+#if !defined(__cpp_lib_expected) || __cpp_lib_expected < 202202L
+// The library was built with ob::expected = std::expected; so must this file be.
+#error "orderbook was built with OB_USE_STD_EXPECTED=ON: compile this file as C++23"
+#endif
 #include <expected>
-/// 1 when `ob::expected` is `std::expected`, 0 when it is the fallback.
-#define OB_HAS_STD_EXPECTED 1
-#else
-#define OB_HAS_STD_EXPECTED 0
 #endif
 
 namespace ob {
@@ -110,7 +119,7 @@ class ExpectedFallback {
 
 }  // namespace detail
 
-#if OB_HAS_STD_EXPECTED
+#if OB_USE_STD_EXPECTED
 /// `std::expected<T, E>`.
 template <class T, class E>
 using expected = std::expected<T, E>;

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
-// Smoke test for the installed or fetched package: one trade, printed.
+// Smoke test for the installed or fetched package: one trade, printed, and
+// the compiled CSV functions, whose return type is part of the library's ABI.
 
 #include <iostream>
 #include <string>
@@ -7,6 +8,17 @@
 #include <type_traits>
 
 #include <orderbook/orderbook.hpp>
+
+namespace {
+
+int check(bool ok, std::string_view what) {
+  if (!ok) {
+    std::cerr << "consumer: " << what << " failed\n";
+  }
+  return ok ? 0 : 1;
+}
+
+}  // namespace
 
 int main() {
   ob::Engine engine;
@@ -26,5 +38,18 @@ int main() {
   std::cout << out;
   constexpr std::string_view kExpected =
       "fill XYZ taker=2 maker=1 side=buy price=100 qty=4 taker_left=0 maker_left=6\n";
-  return out == kExpected ? 0 : 1;
+  int failures = check(out == kExpected, "fill output");
+
+  const auto bad = ob::parse_csv_record("bogus,XYZ,1", 3);
+  failures += check(!bad.has_value() && bad.error().line == 3 &&
+                        bad.error().code == ob::CsvErrorCode::unknown_action,
+                    "parse_csv_record on a bad line");
+  ob::CsvReader reader("new,XYZ,7,buy,limit,10050,100,7\n");
+  const auto item = reader.next();
+  failures += check(item.has_value() && item->has_value() && (**item).id == ob::OrderId{7} &&
+                        (**item).price == ob::Price{10050} && !reader.next().has_value(),
+                    "CsvReader::next on a valid line");
+  std::cout << "OB_USE_STD_EXPECTED=" << OB_USE_STD_EXPECTED << " __cplusplus=" << __cplusplus
+            << '\n';
+  return failures == 0 ? 0 : 1;
 }

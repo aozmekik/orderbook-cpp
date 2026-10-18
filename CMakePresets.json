@@ -26,9 +26,13 @@
     },
     {
       "name": "cxx23",
-      "displayName": "Debug build in C++23 mode (exercises std::expected)",
+      "displayName": "Debug build in C++23 with ob::expected = std::expected",
       "inherits": "base",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "CMAKE_CXX_STANDARD": "23" }
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_STANDARD": "23",
+        "OB_USE_STD_EXPECTED": "ON"
+      }
     },
     {
       "name": "asan-ubsan",

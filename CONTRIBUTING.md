@@ -82,13 +82,18 @@ actionlint
 CXX=$(brew --prefix llvm)/bin/clang++ cmake --preset fuzz   # Linux: CXX=clang++-18
 cmake --build --preset fuzz
 mkdir -p /tmp/corpus-csv /tmp/corpus-engine
-./build/fuzz/fuzz/fuzz_csv    -max_total_time=60 /tmp/corpus-csv    fuzz/corpus
-./build/fuzz/fuzz/fuzz_engine -max_total_time=60 /tmp/corpus-engine fuzz/corpus
+./build/fuzz/fuzz/fuzz_csv    -max_total_time=60 /tmp/corpus-csv    fuzz/corpus/csv
+./build/fuzz/fuzz/fuzz_engine -max_total_time=60 /tmp/corpus-engine fuzz/corpus/engine
 ```
 
-The first directory collects new inputs; `fuzz/corpus` is the checked-in seed
-corpus. A crash writes `crash-<hash>` into the current directory; reproduce it
-with `./build/fuzz/fuzz/fuzz_engine crash-<hash>`, then add a regression test.
+The first directory collects new inputs; `fuzz/corpus/csv` and
+`fuzz/corpus/engine` are the checked-in seeds. A `fuzz_engine` input starts
+with a byte that selects the self-trade policy (`byte % 3`: `0` none, `1`
+cancel_newest, `2` cancel_oldest) and the id-map hash seed, so each engine seed
+begins with that digit on a line of its own. The preset keeps assertions on
+and the fuzz targets check every book's invariants after every command. A
+crash writes `crash-<hash>` into the current directory; reproduce it with
+`./build/fuzz/fuzz/fuzz_engine crash-<hash>`, then add a regression test.
 
 ## Coverage
 

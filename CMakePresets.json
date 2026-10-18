@@ -58,10 +58,11 @@
     },
     {
       "name": "fuzz",
-      "displayName": "libFuzzer targets (set CXX to a Clang that ships libFuzzer)",
+      "displayName": "libFuzzer targets with assertions on (set CXX to a Clang that ships libFuzzer)",
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O2 -g",
         "OB_BUILD_FUZZERS": "ON",
         "OB_BUILD_TESTS": "OFF",
         "OB_BUILD_BENCHMARKS": "OFF",

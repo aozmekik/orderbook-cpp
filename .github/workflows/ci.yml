@@ -127,8 +127,8 @@ jobs:
       - name: Fuzz the CSV parser
         run: |
           mkdir -p "$RUNNER_TEMP/corpus-csv"
-          build/fuzz/fuzz/fuzz_csv -max_total_time=60 "$RUNNER_TEMP/corpus-csv" fuzz/corpus
+          build/fuzz/fuzz/fuzz_csv -max_total_time=60 "$RUNNER_TEMP/corpus-csv" fuzz/corpus/csv
       - name: Fuzz the engines against each other
         run: |
           mkdir -p "$RUNNER_TEMP/corpus-engine"
-          build/fuzz/fuzz/fuzz_engine -max_total_time=60 "$RUNNER_TEMP/corpus-engine" fuzz/corpus
+          build/fuzz/fuzz/fuzz_engine -max_total_time=60 "$RUNNER_TEMP/corpus-engine" fuzz/corpus/engine

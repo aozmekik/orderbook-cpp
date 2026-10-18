@@ -2,8 +2,10 @@
 // Differential libFuzzer target: parses the input as an order stream and
 // replays it through the ladder (with a 64-tick window, so that the
 // overflow and window shifts are exercised), the std::map baseline and the
-// reference book. Aborts if their events ever differ or if a book violates
-// an invariant. The first byte selects the self-trade prevention policy.
+// reference book. Aborts if their events ever differ, or if a book violates
+// an invariant after any command. The first byte selects the self-trade
+// prevention policy (byte % 3) and the id-map hash seed; the seed corpus in
+// fuzz/corpus/engine/ starts every input with that byte on its own line.
 
 #include <cstddef>
 #include <cstdint>
@@ -26,11 +28,9 @@ namespace {
 }
 
 template <class EngineT>
-void check(const EngineT& engine) {
-  for (std::size_t i = 0; i < engine.symbol_count(); ++i) {
-    if (engine.find_book(static_cast<ob::SymbolId>(i))->check_invariants()) {
-      fail();
-    }
+void check(const EngineT& engine, ob::SymbolId symbol) {
+  if (engine.find_book(symbol)->check_invariants()) {
+    fail();
   }
 }
 
@@ -42,6 +42,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
   }
   ob::BookConfig config;
   config.stp = static_cast<ob::StpPolicy>(data[0] % 3);
+  config.hash_seed = 1U + (data[0] / 3U);  // Reproducible, and varied across inputs.
   config.ladder_ticks = 64;
   config.initial_capacity = 4;
   ob::Engine ladder(config);
@@ -76,9 +77,9 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     if (ladder_events.events != expected.events || map_events.events != expected.events) {
       fail();
     }
+    check(ladder, symbol);
+    check(map, symbol);
+    check(reference, symbol);
   }
-  check(ladder);
-  check(map);
-  check(reference);
   return 0;
 }

@@ -1,0 +1,8 @@
+1
+# Self-trade prevention: owner 7 rests an ask behind owner 1's, then buys.
+# Replay with --stp=cancel_newest or --stp=cancel_oldest to compare.
+action,symbol,id,side,type,price,qty,owner
+new,XYZ,1,sell,limit,500,100,1
+new,XYZ,2,sell,limit,500,100,7
+new,XYZ,3,sell,limit,501,100,1
+new,XYZ,4,buy,limit,501,250,7

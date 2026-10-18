@@ -19,6 +19,7 @@ jobs:
     # clang-tidy runs against the macOS SDK, the configuration the pinned
     # tools are checked with locally (see CONTRIBUTING.md).
     runs-on: macos-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -42,6 +43,7 @@ jobs:
   test:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -70,17 +72,32 @@ jobs:
         run: cmake --build --preset ${{ matrix.preset }} --parallel 4
       - name: Test
         run: ctest --preset ${{ matrix.preset }} --parallel 4
-      - name: Install and build a downstream project with find_package
+      # The library's interface must not depend on the consumer's language
+      # mode: a C++20 build is consumed as C++20 and as C++23, and the
+      # std::expected build (cxx23 preset) as C++23.
+      - name: Consume the installed package with find_package
+        if: matrix.preset == 'release' || matrix.preset == 'cxx23'
+        run: |
+          cmake --install "build/${{ matrix.preset }}" --prefix "$RUNNER_TEMP/prefix"
+          for std in 20 23; do
+            cmake -S tests/package -B "build/package-$std" -G Ninja \
+              -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/prefix" -DCONSUMER_CXX_STANDARD="$std"
+            cmake --build "build/package-$std"
+            "./build/package-$std/consumer"
+          done
+      - name: Consume the repository with FetchContent
         if: matrix.preset == 'release'
         run: |
-          cmake --install build/release --prefix "$RUNNER_TEMP/prefix"
-          cmake -S tests/package -B build/package -G Ninja -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/prefix"
-          cmake --build build/package
-          ./build/package/consumer
+          cmake -S tests/package -B build/package-fetch -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DOB_FETCH_REPOSITORY="$GITHUB_WORKSPACE" -DOB_FETCH_TAG="$GITHUB_SHA" \
+            -DCONSUMER_CXX_STANDARD=23
+          cmake --build build/package-fetch
+          ./build/package-fetch/consumer
 
   sanitizers:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -112,6 +129,7 @@ jobs:
   fuzz:
     name: Fuzz (libFuzzer, 60 s per target)
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     env:
       CXX: clang++-18
     steps:

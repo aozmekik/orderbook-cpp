@@ -71,7 +71,39 @@ void* operator new[](std::size_t size, const std::nothrow_t& /*tag*/) noexcept {
     return nullptr;
   }
 }
+void* operator new(std::size_t size, std::align_val_t align,
+                   const std::nothrow_t& /*tag*/) noexcept {
+  try {
+    return counted_allocate(size, static_cast<std::size_t>(align));
+  } catch (...) {
+    return nullptr;
+  }
+}
+void* operator new[](std::size_t size, std::align_val_t align,
+                     const std::nothrow_t& /*tag*/) noexcept {
+  try {
+    return counted_allocate(size, static_cast<std::size_t>(align));
+  } catch (...) {
+    return nullptr;
+  }
+}
+// Every replaceable deallocation function is defined too, so that no
+// variant from the standard library (or a sanitizer runtime) is mixed in.
 void operator delete(void* memory) noexcept {
+  std::free(memory);
+}
+void operator delete(void* memory, const std::nothrow_t& /*tag*/) noexcept {
+  std::free(memory);
+}
+void operator delete[](void* memory, const std::nothrow_t& /*tag*/) noexcept {
+  std::free(memory);
+}
+void operator delete(void* memory, std::align_val_t /*align*/,
+                     const std::nothrow_t& /*tag*/) noexcept {
+  std::free(memory);
+}
+void operator delete[](void* memory, std::align_val_t /*align*/,
+                       const std::nothrow_t& /*tag*/) noexcept {
   std::free(memory);
 }
 void operator delete[](void* memory) noexcept {

@@ -48,6 +48,12 @@ ob_enable_warnings(orderbook)
 
 # --- Command-line tools, examples, tests, benchmarks, fuzzers ----------------
 
+# Before any add_subdirectory: tests declared in a directory processed before
+# enable_testing() (the examples, the benchmark smoke test) would be dropped.
+if(OB_BUILD_TESTS)
+  enable_testing()
+endif()
+
 if(OB_BUILD_APPS)
   add_subdirectory(apps)
 endif()
@@ -61,7 +67,6 @@ if(OB_BUILD_TESTS OR OB_BUILD_BENCHMARKS)
 endif()
 
 if(OB_BUILD_TESTS)
-  enable_testing()
   add_subdirectory(tests)
 endif()
 

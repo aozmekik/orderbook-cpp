@@ -221,7 +221,7 @@ Measured in this session on an Apple M1 Pro (16 GB, macOS 26.6.2):
 | What | Result | Command and toolchain |
 | --- | --- | --- |
 | Test suite | 233 tests pass (215 GoogleTest cases, 18 CLI and example tests); 234 in release with the benchmark smoke test | `ctest --preset dev`, `ctest --preset release`, `asan-ubsan`, `tsan`, `cxx23`; Apple clang 21.0.0 |
-| Coverage of `include/` and `src/` | 96.5% of lines, 92.3% of branches, 99.6% of functions | `scripts/coverage.sh /opt/homebrew/opt/llvm/bin`; Homebrew LLVM 23.1.3 |
+| Coverage of `include/` and `src/` | 96.5% of lines (2,080), 99.6% of functions, 92.1% to 92.3% of branches across three runs | `scripts/coverage.sh /opt/homebrew/opt/llvm/bin`; Homebrew LLVM 23.1.3 |
 | `fuzz_csv` | 1,828,250 inputs in 61 s, no failure | `-max_total_time=60`; Homebrew clang 23.1.3, ASan + UBSan |
 | `fuzz_engine` | 1,993,991 inputs in 121 s, no failure | `-max_total_time=120`; same |
 | Cross-toolchain determinism | identical SHA-256 of `obgen` output (1M commands) and of `obreplay --events` on it, all three engines | Apple clang 21 / libc++ vs. Homebrew GCC 14.2 / libstdc++ builds |

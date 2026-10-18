@@ -53,7 +53,9 @@ The window follows the touch with hysteresis:
 - a key better than `base` moves the window down so that the key sits W/8
   above `base`, and the far end of the ring moves to the overflow;
 - when the best key drifts W/2 above `base`, the window moves up to restore
-  W/8 of headroom and pulls overflow levels that now fit;
+  W/8 of headroom and pulls overflow levels that now fit, but only once as
+  many operations have passed since the previous window move as that move
+  touched levels;
 - emptying the ring re-centres the window on the best overflow level, so the
   ring is never empty while the overflow is not.
 
@@ -75,13 +77,30 @@ map, event code) identical.
 - Levels outside the window cost O(log n) to find and O(n) to insert or
   remove in the overflow vector. A workload that places many orders far from
   the touch pays for that; the `WorkloadWide` benchmark measures it.
-- Window moves cost O(levels moved + W/64). The hysteresis keeps them rare
-  for a slowly moving touch; an adversarial stream that jumps the price by
-  more than W on every order would make every insert move the window.
+- Window moves cost O(levels moved + W/64). A move down is forced (the best
+  key must be in the ring); a move up is voluntary, and the delay above
+  makes moves amortised O(1) per operation for a stream that alternates
+  between a price far better than the best and the old touch. Without the
+  delay, toggling one order 3W/8 or more ticks better than the best of a
+  dense book moved the window down and back up on every request: with
+  W = 4096 and 3,000 ask levels, about 4.5 us of CPU time per request at
+  1,600 ticks and 10.8 us at 3,000 ticks, against about 45 ns for
+  `std::map`. With it, those cases cost 44 ns and 64 ns per request on
+  average; the single request that does move the window still pays
+  O(levels moved). Toggling by about W or more empties the ring, which
+  forces a move on every request (13.8 us each in the same book). The
+  `WindowToggle` benchmarks measure these cases; docs/benchmarks.md has
+  the numbers and how they were taken.
+- The overflow is a sorted vector, so inserting into or erasing from it
+  moves O(n) entries. With 100,000 levels beyond the window, an add or a
+  cancel there costs about 15.6 us against 152 ns for `std::map` (the
+  `DeepOverflow` benchmark). Books whose activity lives far from the touch
+  should use a wider window or `MapOrderBook`; a better far-from-touch
+  structure is on the roadmap.
 - The invariants (bitmap matches the slots, the best key is the minimum, the
   overflow is sorted and outside the window, ring empty implies overflow
-  empty) are checked by `LadderLevels::check_invariants`, in every debug
-  build after every book operation, and the index is tested against a
+  empty) are checked by `LadderLevels::check_invariants`, after every book
+  operation in this project's debug builds, and the index is tested against a
   `std::map` model with windows as small as 64 ticks.
 - W is a tuning knob (`BookConfig::ladder_ticks`). It should cover the
   price range where most of the activity happens; it does not limit the

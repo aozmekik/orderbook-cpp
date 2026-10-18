@@ -50,10 +50,12 @@ when it is killed.
 
 ### Market, IOC and FOK orders are accepted, then cancelled
 
-Every valid new order produces `Accepted` first, so a consumer can rely on
-one rule: an accepted order's quantity is accounted for by fills, at most
-one `Cancelled`, and what rests. Only invalid requests and post-only orders
-that would cross produce `Rejected`.
+Every new order that the book takes on produces `Accepted` first, so a
+consumer can rely on one rule: an accepted order's quantity is accounted for
+by fills, at most one `Cancelled`, and what rests. Only orders that fail
+validation, reuse a live id, find the book full or are post-only orders that
+would cross produce `Rejected`; an IOC that finds nothing to trade is
+accepted and then cancelled.
 
 ### `book_full` is checked on arrival
 

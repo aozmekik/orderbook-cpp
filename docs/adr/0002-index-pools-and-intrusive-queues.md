@@ -33,18 +33,28 @@ pointers through scattered heap nodes, and must find an order by id in O(1).
 - `detail::OrderIdMap` maps order ids to node indices with linear probing in
   a power-of-two table at most half full. Deletion uses backward shifting
   (Knuth's Algorithm R) instead of tombstones, so probe lengths do not decay
-  under the constant insert/erase churn of a book. Keys are mixed with the
-  MurmurHash3 finalizer because ids are usually sequential. Id 0 marks an
-  empty slot, which is why order id 0 is invalid.
-- Pools and the map grow geometrically when full, like `std::vector`.
-  `BookConfig::initial_capacity` (or `reserve`) sizes them up front.
+  under the constant insert/erase churn of a book. Id 0 marks an empty slot,
+  which is why order id 0 is invalid.
+- The home slot of an id is the top bits of `fmix64(id) * m`: the MurmurHash3
+  finalizer spreads sequential ids, and `m` is an odd multiplier derived from
+  a per-book seed (`BookConfig::hash_seed`, random by default), which makes
+  the slot a multiply-shift hash (Dietzfelbinger et al., 1997). Ids are
+  chosen by clients and fmix64 is public and invertible: without the seed a
+  client could choose ids that all share one slot, and every request would
+  scan the table. The seed is not a cryptographic key; a venue exposed to
+  untrusted clients should still map their ids to its own at the gateway.
+- Pools, the map and the ladder's overflow grow geometrically when full,
+  like `std::vector`. `BookConfig::initial_capacity` (or `reserve`) sizes all
+  of them up front.
 
 ## Consequences
 
-- A book that stays within its reserved capacity performs no heap allocation
-  while it processes requests. `tests/allocation_test.cpp` replaces the
-  global allocator and checks exactly that on a synthetic workload (and that
-  the `std::map` baseline does allocate).
+- An `OrderBook` that stays within its reserved capacity performs no heap
+  allocation while it processes requests, wherever its price levels are.
+  `tests/allocation_test.cpp` replaces the global allocator and checks that
+  on the near-touch and the wide synthetic workloads, with 200 levels outside
+  the ladder window, after a window move that evicts 500 levels and after
+  `reserve`; it also checks that the `std::map` baseline does allocate.
 - Growth is a reallocation and a copy (or a rehash) of the whole pool, a
   latency spike proportional to the book size. Production systems would
   reserve for the worst case; the default reserves 1024 orders.

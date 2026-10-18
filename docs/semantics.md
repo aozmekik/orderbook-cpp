@@ -120,14 +120,17 @@ book, which [`examples/market_data.cpp`](../examples/market_data.cpp)
 demonstrates.
 
 Accounting: every accepted order's quantity is eventually accounted for by
-its fills, at most one `Cancelled`, and what still rests. Each book checks
-the corresponding conservation law (accepted + increases = 2 x filled +
-cancelled + decreases + resting) after every request in debug builds.
+its fills, at most one `Cancelled`, and what still rests. With
+`OB_ENABLE_INVARIANT_CHECKS=1` (this project's own unoptimised builds), each
+book checks the corresponding conservation law (accepted + increases = 2 x
+filled + cancelled + decreases + resting) after every request.
 
 ## Determinism
 
-Nothing in a book depends on time, addresses, hash-table iteration order or
-the platform's random number generator. The same requests always produce the
-same events, and `ob::append_event` renders them without locale or
+Nothing a book emits depends on time, addresses, hash-table iteration order
+or the platform's random number generator. The one random input of a book,
+the seed of its order-id hash table (`BookConfig::hash_seed`, drawn from
+`std::random_device` unless set), decides only where ids sit in that table,
+which is never iterated. The same requests always produce the same events, and `ob::append_event` renders them without locale or
 formatting state, so `obreplay` output is byte-identical between runs and
 between the three book implementations (`tests/golden/`).

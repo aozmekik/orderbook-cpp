@@ -4,9 +4,11 @@
 /// receive them.
 ///
 /// Every request produces events synchronously, in a fixed order documented
-/// in docs/semantics.md. A valid new order always produces exactly one
-/// `Accepted`; from then on, its quantity is accounted for by `Fill`s, at most
-/// one `Cancelled`, and whatever is left resting in the book.
+/// in docs/semantics.md. A new order produces either one `Rejected` (it
+/// failed `validate()`, reused a live id, found the book full, or is a
+/// post-only order that would cross) or exactly one `Accepted`; from then
+/// on, its quantity is accounted for by `Fill`s, at most one `Cancelled`,
+/// and whatever is left resting in the book.
 
 #pragma once
 
@@ -100,7 +102,9 @@ using Event = std::variant<Accepted, Rejected, Fill, Cancelled, Modified, BookDe
 
 /// A callable that receives every event type. Sinks are invoked synchronously
 /// from inside the book; they must not throw and must not call back into the
-/// book that is invoking them.
+/// book that is invoking them. Books take sinks by lvalue reference, so that
+/// the events a sink collects cannot vanish with a temporary: declare even a
+/// `NullSink` before passing it.
 template <class S>
 concept EventSink = std::invocable<S&, const Accepted&> && std::invocable<S&, const Rejected&> &&
                     std::invocable<S&, const Fill&> && std::invocable<S&, const Cancelled&> &&

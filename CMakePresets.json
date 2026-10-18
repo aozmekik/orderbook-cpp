@@ -65,6 +65,17 @@
         "OB_BUILD_APPS": "OFF",
         "CMAKE_CXX_FLAGS": "-fno-omit-frame-pointer -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all"
       }
+    },
+    {
+      "name": "coverage",
+      "displayName": "Clang source-based coverage (set CXX to clang++; see scripts/coverage.sh)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "OB_BUILD_BENCHMARKS": "OFF",
+        "CMAKE_CXX_FLAGS": "-fprofile-instr-generate -fcoverage-mapping",
+        "CMAKE_EXE_LINKER_FLAGS": "-fprofile-instr-generate"
+      }
     }
   ],
   "buildPresets": [
@@ -73,7 +84,8 @@
     { "name": "cxx23", "configurePreset": "cxx23" },
     { "name": "asan-ubsan", "configurePreset": "asan-ubsan" },
     { "name": "tsan", "configurePreset": "tsan" },
-    { "name": "fuzz", "configurePreset": "fuzz" }
+    { "name": "fuzz", "configurePreset": "fuzz" },
+    { "name": "coverage", "configurePreset": "coverage" }
   ],
   "testPresets": [
     {
@@ -91,6 +103,12 @@
       "inherits": "base",
       "configurePreset": "tsan",
       "environment": { "TSAN_OPTIONS": "halt_on_error=1" }
+    },
+    {
+      "name": "coverage",
+      "inherits": "base",
+      "configurePreset": "coverage",
+      "environment": { "LLVM_PROFILE_FILE": "${sourceDir}/build/coverage/profiles/%p-%m.profraw" }
     }
   ],
   "workflowPresets": [

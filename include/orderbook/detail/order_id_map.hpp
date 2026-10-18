@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <bit>
 #include <cassert>
 #include <cstddef>
@@ -22,13 +23,27 @@ namespace ob::detail {
 /// probe lengths do not degrade under the insert/erase churn of an order book.
 /// Key 0 marks an empty slot, which is why order id 0 is reserved.
 ///
-/// Keys are scrambled with the MurmurHash3 64-bit finalizer because order ids
-/// are usually sequential, and sequential keys would form long clusters under
-/// an identity hash.
+/// The home slot of a key is `(fmix64(key) * m) >> (64 - log2(table size))`:
+/// the MurmurHash3 finalizer spreads sequential ids, and multiply-shift
+/// hashing with an odd multiplier `m` derived from a per-map seed
+/// (Dietzfelbinger et al., 1997) makes any two distinct keys share a home
+/// slot with probability at most 2 / table size over the choice of seed.
+/// Keys are chosen by clients and fmix64 is public and invertible, so
+/// without the seed a client could pick ids that all land in one slot and
+/// turn every operation into a scan of the whole table. With a secret seed
+/// such a set of ids cannot be computed in advance. This is not a
+/// cryptographic guarantee: a client that can time many requests could in
+/// principle learn about the seed, so a venue facing untrusted clients
+/// should still map their ids to its own at the gateway.
 class OrderIdMap {
  public:
-  /// Creates a map that holds `capacity` keys before it has to grow.
-  explicit OrderIdMap(std::size_t capacity = 16) { rehash(table_size_for(capacity)); }
+  /// Creates a map that holds `capacity` keys before it has to grow, hashing
+  /// with `seed`. Equal seeds give equal table layouts; the layout never
+  /// affects what the map returns.
+  explicit OrderIdMap(std::size_t capacity = 16, std::uint64_t seed = 0)
+      : multiplier_(odd_multiplier(seed)) {
+    rehash(table_size_for(capacity));
+  }
 
   /// The value stored for `key`, or `kNil`.
   [[nodiscard]] Index find(std::uint64_t key) const noexcept {
@@ -95,6 +110,24 @@ class OrderIdMap {
   /// Number of keys that fit without growing.
   [[nodiscard]] std::size_t capacity() const noexcept { return slots_.size() / 2; }
 
+  /// The 64-bit hash of `key` under `seed`. The home slot of `key` in a
+  /// table of 2^b slots is the top b bits.
+  [[nodiscard]] static std::uint64_t hash(std::uint64_t key, std::uint64_t seed) noexcept {
+    return mix(key) * odd_multiplier(seed);
+  }
+
+  /// The longest distance of a key from its home slot: the worst probe
+  /// sequence of a lookup, minus one. O(table size); for tests.
+  [[nodiscard]] std::size_t longest_probe() const noexcept {
+    std::size_t longest = 0;
+    for (std::size_t i = 0; i < slots_.size(); ++i) {
+      if (slots_[i].key != 0) {
+        longest = std::max(longest, (i - home(slots_[i].key)) & mask_);
+      }
+    }
+    return longest;
+  }
+
  private:
   struct Slot {
     std::uint64_t key = 0;
@@ -115,8 +148,18 @@ class OrderIdMap {
     return key;
   }
 
+  /// An odd multiplier drawn from `seed` with the SplitMix64 output function
+  /// (Steele, Lea and Flood, 2014), so that nearby seeds give unrelated
+  /// multipliers.
+  static std::uint64_t odd_multiplier(std::uint64_t seed) noexcept {
+    std::uint64_t z = seed + 0x9e3779b97f4a7c15ULL;
+    z = (z ^ (z >> 30U)) * 0xbf58476d1ce4e5b9ULL;
+    z = (z ^ (z >> 27U)) * 0x94d049bb133111ebULL;
+    return (z ^ (z >> 31U)) | 1U;
+  }
+
   [[nodiscard]] std::size_t home(std::uint64_t key) const noexcept {
-    return static_cast<std::size_t>(mix(key)) & mask_;
+    return static_cast<std::size_t>((mix(key) * multiplier_) >> shift_);
   }
 
   void place(std::uint64_t key, Index value) noexcept {
@@ -131,6 +174,7 @@ class OrderIdMap {
     std::vector<Slot> old(table_size);
     old.swap(slots_);
     mask_ = table_size - 1;
+    shift_ = static_cast<unsigned>(64 - std::countr_zero(table_size));
     for (const Slot& slot : old) {
       if (slot.key != 0) {
         place(slot.key, slot.value);
@@ -139,8 +183,14 @@ class OrderIdMap {
   }
 
   std::vector<Slot> slots_;
+  std::uint64_t multiplier_;
   std::size_t mask_ = 0;
+  unsigned shift_ = 64;
   std::size_t size_ = 0;
 };
+
+/// A seed for `OrderIdMap` from `std::random_device`. Allocates nothing but
+/// may be slow; call it when a book is created, not per request.
+[[nodiscard]] std::uint64_t random_hash_seed();
 
 }  // namespace ob::detail

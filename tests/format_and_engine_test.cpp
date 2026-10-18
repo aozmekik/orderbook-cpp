@@ -15,6 +15,7 @@
 #include <orderbook/format.hpp>
 #include <orderbook/order_book.hpp>
 #include <orderbook/types.hpp>
+#include <orderbook/workload.hpp>
 
 #include "test_support.hpp"
 
@@ -151,6 +152,29 @@ TEST(EngineTest, WorksWithEveryBookImplementation) {
   EXPECT_EQ(run(MapEngine{}), expected);
   EXPECT_EQ(run(ReferenceEngine{}), expected);
   EXPECT_EQ(expected.size(), 6U);
+}
+
+TEST(EngineTest, EventsDoNotDependOnTheHashSeed) {
+  // The seed only moves ids around inside the id map's table.
+  workload::Config config;
+  config.commands = 20'000;
+  config.symbols = 2;
+  const workload::Workload w = workload::generate(config);
+  const auto replay = [&](std::uint64_t seed) {
+    Engine engine(BookConfig{.hash_seed = seed});
+    for (const std::string& name : w.symbols) {
+      engine.add_symbol(name);
+    }
+    VectorSink sink;
+    for (const Command& command : w.commands) {
+      engine.apply(command, sink);
+    }
+    return sink.events;
+  };
+  const std::vector<Event> first = replay(1);
+  EXPECT_GT(first.size(), w.commands.size());
+  EXPECT_EQ(replay(2), first);
+  EXPECT_EQ(replay(0), first);  // A random seed.
 }
 
 }  // namespace

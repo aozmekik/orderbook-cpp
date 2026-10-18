@@ -71,7 +71,9 @@ void verify_invariants([[maybe_unused]] const Book& book) noexcept {
 ///   stays within that capacity does not allocate on the hot path;
 /// - each price level is an intrusive doubly linked FIFO through the orders,
 ///   so cancelling from the middle of a queue is O(1);
-/// - order ids map to orders through an open-addressing hash map.
+/// - order ids map to orders through an open-addressing hash map whose hash
+///   is seeded per book (`BookConfig::hash_seed`), so clients cannot choose
+///   ids that collide.
 ///
 /// All mutating calls are `noexcept`: rejections are events, never
 /// exceptions. Allocation failure while a pool grows terminates the process.
@@ -84,7 +86,8 @@ class BasicOrderBook {
       : config_(config),
         bids_(config.ladder_ticks),
         asks_(config.ladder_ticks),
-        ids_(config.initial_capacity) {
+        ids_(config.initial_capacity,
+             config.hash_seed != 0 ? config.hash_seed : detail::random_hash_seed()) {
     reserve(config.initial_capacity);
   }
 

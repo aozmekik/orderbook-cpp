@@ -41,6 +41,13 @@ struct BookConfig {
   /// price. Rounded up to a power of two, minimum 64. Ignored by other level
   /// indexes.
   std::uint32_t ladder_ticks = 4096;
+  /// Seed of the order-id hash table. Order ids are chosen by clients, so a
+  /// hash they could predict would let them pick ids that all collide and
+  /// make every request scan the whole table. Zero (the default) draws a
+  /// fresh seed from `std::random_device` for each book; set it only to make
+  /// the table layout reproducible, for example in tests. The seed never
+  /// changes the events a book emits. `ReferenceBook` ignores it.
+  std::uint64_t hash_seed = 0;
 };
 
 /// Aggregate view of one price level.

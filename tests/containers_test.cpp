@@ -103,7 +103,7 @@ TEST(OrderIdMapTest, ReserveAvoidsRehashing) {
 // that clusters wrap around the end of the array.
 TEST(OrderIdMapTest, AgreesWithStdUnorderedMapUnderChurn) {
   for (std::uint64_t seed = 1; seed <= 5; ++seed) {
-    OrderIdMap map(8);
+    OrderIdMap map(8, seed);
     std::unordered_map<std::uint64_t, Index> model;
     Rng rng(seed);
     for (int op = 0; op < 200'000; ++op) {
@@ -127,6 +127,82 @@ TEST(OrderIdMapTest, AgreesWithStdUnorderedMapUnderChurn) {
     for (const auto& [key, value] : model) {
       ASSERT_EQ(map.find(key), value);
     }
+  }
+}
+
+/// Inverse of a multiplication by an odd 64-bit number (Newton's method).
+std::uint64_t inverse(std::uint64_t odd) {
+  std::uint64_t x = odd;  // Correct to 3 bits; each step doubles that.
+  for (int i = 0; i < 5; ++i) {
+    x *= 2 - (odd * x);
+  }
+  return x;
+}
+
+/// Inverse of the MurmurHash3 fmix64 finalizer: what an attacker who knows
+/// the hash would compute. x ^= x >> 33 is its own inverse.
+std::uint64_t unmix(std::uint64_t h) {
+  h ^= h >> 33U;
+  h *= inverse(0xc4ceb9fe1a85ec53ULL);
+  h ^= h >> 33U;
+  h *= inverse(0xff51afd7ed558ccdULL);
+  h ^= h >> 33U;
+  return h;
+}
+
+/// `count` distinct keys that all hash to the home slot 0 under `seed`.
+std::vector<std::uint64_t> colliding_keys(std::uint64_t seed, std::size_t count) {
+  const std::uint64_t multiplier = OrderIdMap::hash(unmix(1), seed);
+  const std::uint64_t undo = inverse(multiplier);
+  std::vector<std::uint64_t> keys;
+  for (std::uint64_t i = 1; keys.size() < count; ++i) {
+    const std::uint64_t key = unmix(i * undo);  // hash(key, seed) == i: top bits zero.
+    if (key != 0) {
+      keys.push_back(key);
+    }
+  }
+  return keys;
+}
+
+TEST(OrderIdMapTest, UnmixInvertsTheFinalizer) {
+  // hash(k, seed) == fmix64(k) * m for an odd m, so hash(unmix(x)) == x * m
+  // for every x exactly when unmix inverts fmix64.
+  const std::uint64_t m = OrderIdMap::hash(unmix(1), 77);
+  EXPECT_EQ(m % 2, 1U);
+  for (const std::uint64_t x : {2ULL, 3ULL, 12'345ULL, 0xdead'beefULL, ~0ULL}) {
+    EXPECT_EQ(OrderIdMap::hash(unmix(x), 77), x * m);
+  }
+}
+
+// Keys chosen to collide under one seed fill a single cluster under that
+// seed, and spread out under any other: the seed is what defeats a client
+// that picks its order ids from the (public, invertible) hash function.
+TEST(OrderIdMapTest, KeysChosenForOneSeedDoNotCollideUnderAnother) {
+  constexpr std::size_t kKeys = 4096;
+  const std::vector<std::uint64_t> keys = colliding_keys(1, kKeys);
+
+  OrderIdMap attacked(kKeys, 1);
+  OrderIdMap seeded(kKeys, 2);
+  for (const std::uint64_t key : keys) {
+    attacked.insert(key, 0);
+    seeded.insert(key, 0);
+  }
+  EXPECT_EQ(attacked.longest_probe(), kKeys - 1);  // One cluster: every lookup scans it.
+  EXPECT_LT(seeded.longest_probe(), 16U);
+  for (const std::uint64_t key : keys) {
+    ASSERT_EQ(seeded.find(key), 0U);
+    ASSERT_TRUE(seeded.erase(key));
+  }
+  EXPECT_EQ(seeded.size(), 0U);
+}
+
+TEST(OrderIdMapTest, SequentialKeysStayCloseToHome) {
+  for (std::uint64_t seed = 0; seed < 8; ++seed) {
+    OrderIdMap map(100'000, seed);
+    for (std::uint64_t key = 1; key <= 100'000; ++key) {
+      map.insert(key, 0);
+    }
+    EXPECT_LT(map.longest_probe(), 64U) << "seed " << seed;
   }
 }
 

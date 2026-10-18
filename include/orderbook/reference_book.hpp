@@ -29,6 +29,9 @@ namespace ob {
 /// level. It shares no matching code with `BasicOrderBook`, so agreement
 /// between the two on millions of random requests is meaningful evidence
 /// that both implement the semantics in docs/semantics.md.
+///
+/// It is a test oracle, not a hardened book: its `std::unordered_map` uses
+/// `std::hash`, so clients that choose their order ids could make it slow.
 class ReferenceBook {
  public:
   /// Creates an empty book. Only `symbol`, `stp` and `max_orders` matter.

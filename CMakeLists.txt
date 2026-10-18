@@ -36,6 +36,7 @@ add_library(
   orderbook
   src/csv.cpp
   src/format.cpp
+  src/hash_seed.cpp
   src/types.cpp
   src/workload.cpp)
 add_library(orderbook::orderbook ALIAS orderbook)

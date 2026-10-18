@@ -281,7 +281,8 @@ TEST_P(DifferentialTest, OptimisedBooksAgreeWithTheReference) {
   BookConfig config;
   config.stp = params.stp;
   config.ladder_ticks = params.ladder_ticks;
-  config.initial_capacity = 64;  // Small, so that pools and the id map grow during the run.
+  config.initial_capacity = 64;    // Small, so that pools and the id map grow during the run.
+  config.hash_seed = params.seed;  // A fixed table layout, so that a failure reproduces.
   OrderBook ladder(config);
   MapOrderBook map(config);
   ReferenceBook reference(config);

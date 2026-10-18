@@ -4,6 +4,7 @@
 // event sequence, so the expected output below doubles as a specification.
 
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <string>
 #include <vector>
@@ -567,6 +568,21 @@ TYPED_TEST(BookTest, ForEachOrderOnAMissingLevelVisitsNothing) {
   h.submit(limit(1, kBuy, 100, 5));
   EXPECT_TRUE(h.queue(kBuy, 101).empty());
   EXPECT_TRUE(h.queue(kSell, 100).empty());
+}
+
+TYPED_TEST(BookTest, ForEachOrderOutsideThePriceRangeVisitsNothing) {
+  // INT64_MIN cannot be negated into a bid key; no level can exist there anyway.
+  auto& h = this->h;
+  h.submit(limit(1, kBuy, kMinPrice.value(), 5));
+  h.submit(limit(2, kSell, kMaxPrice.value(), 5));
+  for (const Side side : {kBuy, kSell}) {
+    EXPECT_TRUE(h.queue(side, std::numeric_limits<std::int64_t>::min()).empty());
+    EXPECT_TRUE(h.queue(side, std::numeric_limits<std::int64_t>::max()).empty());
+    EXPECT_TRUE(h.queue(side, kMinPrice.value() - 1).empty());
+    EXPECT_TRUE(h.queue(side, kMaxPrice.value() + 1).empty());
+  }
+  EXPECT_EQ(h.queue(kBuy, kMinPrice.value()).size(), 1U);
+  EXPECT_EQ(h.queue(kSell, kMaxPrice.value()).size(), 1U);
 }
 
 }  // namespace

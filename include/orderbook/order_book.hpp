@@ -181,9 +181,13 @@ class BasicOrderBook {
   }
 
   /// Calls `visit(OrderView)` for every order resting at `price` on `side`,
-  /// in time priority (first in the queue first).
+  /// in time priority (first in the queue first). Visits nothing for a price
+  /// outside `[kMinPrice, kMaxPrice]`, where no order can rest.
   template <class Visit>
   void for_each_order(Side side, Price price, Visit visit) const {
+    if (!is_valid_price(price)) {
+      return;
+    }
     const detail::Index level = index_of(side).find(level_key(side, price));
     if (level == detail::kNil) {
       return;

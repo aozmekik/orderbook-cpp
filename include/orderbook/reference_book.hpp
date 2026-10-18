@@ -190,9 +190,13 @@ class ReferenceBook {
     return OrderView{it->id, it->owner, location.side, it->type, location.price, it->qty};
   }
 
-  /// Calls `visit(OrderView)` for the orders at `price` on `side`, in priority.
+  /// Calls `visit(OrderView)` for the orders at `price` on `side`, in
+  /// priority. Visits nothing for a price outside `[kMinPrice, kMaxPrice]`.
   template <class Visit>
   void for_each_order(Side side, Price price, Visit visit) const {
+    if (!is_valid_price(price)) {
+      return;
+    }
     const auto level = levels(side).find(price);
     if (level == levels(side).end()) {
       return;

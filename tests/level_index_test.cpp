@@ -247,5 +247,46 @@ TEST(LadderLevelsTest, BestDriftingAwayShiftsTheWindowUp) {
   EXPECT_EQ(index.check_invariants(), std::nullopt);
 }
 
+TEST(LadderLevelsTest, AlternatingFarBetterKeyDoesNotMoveTheWindowEveryTime) {
+  // 48 consecutive levels fill most of [-8, 56). A key 30 ticks better moves
+  // the window down to [-38, 26) and evicts the 22 levels 26 ... 47; removing
+  // it again leaves the best 38 ticks above the base, past the W/2 = 32
+  // re-centring distance, but the window only moves back up after 22 more
+  // operations, so the toggling in between is O(1).
+  LadderLevels index(64);
+  Index next = 0;
+  const auto make = [&] { return next++; };
+  for (LevelKey key = 0; key < 48; ++key) {
+    index.find_or_insert(key, make);
+  }
+  ASSERT_EQ(index.window_begin(), -8);
+  index.find_or_insert(-30, make);
+  EXPECT_EQ(index.window_begin(), -38);
+  EXPECT_EQ(index.overflow_size(), 22U);
+  EXPECT_EQ(index.recenter_credit(), 22U);
+  int toggles = 1;
+  while (index.recenter_credit() > 0) {
+    if (toggles % 2 == 1) {
+      index.erase(-30);
+    } else {
+      index.find_or_insert(-30, make);
+    }
+    ++toggles;
+    ASSERT_EQ(index.window_begin(), -38) << "toggle " << toggles;
+    ASSERT_EQ(index.check_invariants(), std::nullopt);
+  }
+  EXPECT_EQ(toggles, 23);
+  // With the credit spent, the next removal of the far key re-centres.
+  if (index.find(-30) == kNil) {
+    index.find_or_insert(-30, make);
+  }
+  index.erase(-30);
+  EXPECT_EQ(index.window_begin(), -8);
+  EXPECT_EQ(index.overflow_size(), 0U);
+  EXPECT_EQ(index.recenter_credit(), 22U);
+  EXPECT_EQ(index.size(), 48U);
+  EXPECT_EQ(index.check_invariants(), std::nullopt);
+}
+
 }  // namespace
 }  // namespace ob

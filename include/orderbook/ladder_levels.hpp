@@ -32,16 +32,22 @@ namespace ob {
 /// The window follows the touch:
 /// - a key better than `base` shifts the window down so that the key sits
 ///   `W/8` ticks above `base`, evicting the far end into the overflow;
-/// - when the best key drifts more than `W/2` ticks above `base`, the window
+/// - when the best key drifts `W/2` or more ticks above `base`, the window
 ///   shifts up to leave `W/8` ticks of headroom again, pulling overflow levels
-///   that now fit into the ring;
+///   that now fit into the ring, but only once as many operations have passed
+///   since the previous window move as that move touched levels;
 /// - the ring is never empty while the overflow has levels: emptying the ring
 ///   re-centres the window on the best overflow level.
 ///
 /// Every operation near the touch is O(1); the bitmap scan after the best
-/// level empties is O(gap / 64). Work in the overflow is O(log n) to find and
-/// O(n) to insert or erase, which is the price of keeping it compact and
-/// allocation-free once its capacity has been reached.
+/// level empties is O(gap / 64). A window move costs O(levels moved + W/64).
+/// Moves down are forced (the best key must be in the ring); the delay on
+/// voluntary moves up keeps a stream that alternates between a far-better
+/// price and the old touch from moving the window on every request, so
+/// that window moves cost amortised O(1) per operation there, at the price
+/// of the occasional single slow request. Work in the overflow is O(log n)
+/// to find and O(n) to insert or erase, which is the price of keeping it
+/// compact and allocation-free once its capacity has been reached.
 class LadderLevels {
  public:
   /// Smallest window, in ticks.
@@ -79,6 +85,7 @@ class LadderLevels {
   /// `make()`. Allocates only if the overflow outgrows its reserved capacity.
   template <class Make>
   detail::Index find_or_insert(LevelKey key, Make make) {
+    spend_credit();
     if (ring_count_ == 0) {
       assert(overflow_.empty());
       base_ = key - headroom_;
@@ -97,6 +104,7 @@ class LadderLevels {
 
   /// Removes `key`. Precondition: `key` is present.
   void erase(LevelKey key) noexcept {
+    spend_credit();
     if (ring_count_ > 0 && in_window(key)) {
       unplace(key);
       if (ring_count_ == 0) {
@@ -108,7 +116,7 @@ class LadderLevels {
       if (key == best_) {
         // The ring is not empty, so a next level exists; value_or is never used.
         best_ = next_occupied(key + 1, base_ + window_).value_or(best_);
-        if (best_ - base_ >= recenter_distance_) {
+        if (best_ - base_ >= recenter_distance_ && recenter_credit_ == 0) {
           shift_up(best_ - headroom_);
         }
       }
@@ -161,6 +169,9 @@ class LadderLevels {
 
   /// Number of levels outside the window.
   [[nodiscard]] std::size_t overflow_size() const noexcept { return overflow_.size(); }
+
+  /// Operations left before the window may move up again (zero if it may).
+  [[nodiscard]] std::size_t recenter_credit() const noexcept { return recenter_credit_; }
 
   /// Checks the structural invariants; returns a description of the first
   /// violation, or `std::nullopt`. O(window / 64 + levels).
@@ -261,6 +272,8 @@ class LadderLevels {
     return std::nullopt;
   }
 
+  void spend_credit() noexcept { recenter_credit_ -= recenter_credit_ != 0 ? 1U : 0U; }
+
   /// Moves the window down to `new_base` (< base_), evicting ring keys that
   /// no longer fit into the overflow.
   void shift_down(LevelKey new_base) {
@@ -276,26 +289,32 @@ class LadderLevels {
     // existing overflow; reverse them to keep the vector sorted worst-first.
     std::reverse(overflow_.begin() + static_cast<std::ptrdiff_t>(first_evicted), overflow_.end());
     base_ = new_base;
+    recenter_credit_ = overflow_.size() - first_evicted;
   }
 
   /// Moves the window up to `new_base`. Precondition: no ring key is below
   /// `new_base`, so the slots that change meaning are all empty.
   void shift_up(LevelKey new_base) noexcept {
     base_ = new_base;
-    pull_from_overflow();
+    recenter_credit_ = pull_from_overflow();
   }
 
   /// Re-centres an empty ring on the best overflow level.
   void refill_from_overflow() noexcept {
     base_ = overflow_.back().key - headroom_;
-    pull_from_overflow();
+    recenter_credit_ = pull_from_overflow();
   }
 
-  void pull_from_overflow() noexcept {
+  /// Moves the overflow levels that are now inside the window into the ring;
+  /// returns how many moved.
+  std::size_t pull_from_overflow() noexcept {
+    std::size_t moved = 0;
     while (!overflow_.empty() && in_window(overflow_.back().key)) {
       place(overflow_.back().key, overflow_.back().level);
       overflow_.pop_back();
+      ++moved;
     }
+    return moved;
   }
 
   [[nodiscard]] std::vector<Entry>::const_iterator overflow_lower_bound(LevelKey key) const {
@@ -331,6 +350,9 @@ class LadderLevels {
   LevelKey base_ = 0;
   LevelKey best_ = 0;
   std::size_t ring_count_ = 0;
+  // Operations to wait before the next voluntary move up: the number of
+  // levels the previous window move touched (amortises moves to O(1) each).
+  std::size_t recenter_credit_ = 0;
   std::vector<detail::Index> slots_;
   std::vector<std::uint64_t> bits_;
   std::vector<Entry> overflow_;  // Sorted by key, descending: best at the back.

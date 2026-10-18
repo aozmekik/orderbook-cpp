@@ -91,19 +91,36 @@ std::unique_ptr<Book> fresh_book() {
   return std::make_unique<Book>(config);
 }
 
+/// An empty book that has already held `orders`: the memory it reserved has
+/// been written once, so first-touch page faults do not land in timed code.
+/// Orders are cancelled in arrival order, which keeps the reference book's
+/// queue search short.
+template <class Book>
+std::unique_ptr<Book> warm_book(const std::vector<NewOrder>& orders) {
+  std::unique_ptr<Book> book = fresh_book<Book>();
+  ob::NullSink sink;
+  for (const NewOrder& order : orders) {
+    book->submit(order, sink);
+  }
+  for (const NewOrder& order : orders) {
+    book->cancel(ob::CancelOrder{order.symbol, order.id}, sink);
+  }
+  return book;
+}
+
 // --- Micro-benchmarks ---------------------------------------------------------
 
-/// Adds passive orders to a book that grows from empty to kBatch orders.
+/// Adds passive orders to a (warm) book that grows from empty to kBatch orders.
 template <class Book>
 void BM_Add(benchmark::State& state) {
   const std::vector<NewOrder> orders = passive_orders(kBatch, 1);
-  std::unique_ptr<Book> book = fresh_book<Book>();
+  std::unique_ptr<Book> book = warm_book<Book>(orders);
   CountingSink sink;
   std::size_t next = 0;
   for ([[maybe_unused]] const auto _ : state) {
     if (next == orders.size()) {
       state.PauseTiming();
-      book = fresh_book<Book>();
+      book = warm_book<Book>(orders);  // The full book is destroyed while paused.
       next = 0;
       state.ResumeTiming();
     }
@@ -145,8 +162,8 @@ void BM_Cancel(benchmark::State& state) {
   state.SetItemsProcessed(state.iterations());
 }
 
-/// Market orders of 1 to 5 lots against a deep ask side of 100-lot orders:
-/// each iteration fills one to five makers.
+/// Market orders of 100 to 500 lots against a deep ask side of 100-lot
+/// orders: each iteration fills one to five makers.
 template <class Book>
 void BM_Match(benchmark::State& state) {
   ob::Rng rng(4);
@@ -254,6 +271,9 @@ void BM_WorkloadLatency(benchmark::State& state) {
       histogram->record(static_cast<std::uint64_t>(
           std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count()));
     }
+    state.PauseTiming();
+    engine.reset();  // Teardown is not part of the measurement.
+    state.ResumeTiming();
   }
   benchmark::DoNotOptimize(sink.events);
   state.SetItemsProcessed(state.iterations() * static_cast<std::int64_t>(w.commands.size()));
@@ -264,6 +284,85 @@ void BM_WorkloadLatency(benchmark::State& state) {
   state.counters["p99_ns"] = counter(99, 100);
   state.counters["p99.9_ns"] = counter(999, 1000);
   state.counters["max_ns"] = benchmark::Counter(static_cast<double>(histogram->max()));
+}
+
+// --- Known worst cases of the ladder ------------------------------------------
+
+constexpr std::int64_t kAskLevels = 3000;  // One-lot asks at kTouch + 1, + 2, ...
+
+/// A one-sided book of kAskLevels consecutive ask levels inside the ladder
+/// window, and one order submitted `state.range(0)` ticks better than the
+/// best ask and cancelled again, alternately: one iteration is one request.
+/// Past W/8 the submit moves the window down, evicting the far end of the
+/// book into the overflow; the move back up waits until as many requests
+/// have passed as levels moved. Past about W the cancel empties the ring,
+/// which forces a move back on every toggle.
+template <class Book>
+void BM_WindowToggle(benchmark::State& state) {
+  const std::int64_t distance = state.range(0);
+  std::unique_ptr<Book> book = fresh_book<Book>();
+  CountingSink sink;
+  for (std::int64_t i = 0; i < kAskLevels; ++i) {
+    book->submit(NewOrder{SymbolId{0}, OrderId{static_cast<std::uint64_t>(i) + 1}, OwnerId{0},
+                          Side::sell, OrderType::limit, Price{kTouch + 1 + i}, Qty{1}},
+                 sink);
+  }
+  const NewOrder toggled{SymbolId{0},      OrderId{1'000'000},           OwnerId{0}, Side::sell,
+                         OrderType::limit, Price{kTouch + 1 - distance}, Qty{1}};
+  bool resting = false;
+  for ([[maybe_unused]] const auto _ : state) {
+    if (resting) {
+      book->cancel(ob::CancelOrder{SymbolId{0}, toggled.id}, sink);
+    } else {
+      book->submit(toggled, sink);
+    }
+    resting = !resting;
+  }
+  benchmark::DoNotOptimize(sink.events);
+  state.SetItemsProcessed(state.iterations());
+}
+
+constexpr std::int64_t kFarLevels = 100'000;  // Asks 10,000 ticks and more past the touch.
+
+/// One ask at the touch and kFarLevels ask levels far outside the ladder
+/// window (in its sorted overflow, every second tick), then one order added
+/// on a new far level and cancelled again, alternately: one iteration is one
+/// request. Each add or cancel inserts into or erases from the overflow
+/// vector at a random position.
+template <class Book>
+void BM_DeepOverflow(benchmark::State& state) {
+  ob::BookConfig config;
+  config.initial_capacity = 2 * kFarLevels;
+  auto book = std::make_unique<Book>(config);
+  CountingSink sink;
+  const auto ask = [](std::uint64_t id, std::int64_t price) {
+    return NewOrder{SymbolId{0},      OrderId{id},  OwnerId{0}, Side::sell,
+                    OrderType::limit, Price{price}, Qty{1}};
+  };
+  book->submit(ask(1, kTouch + 1), sink);
+  // Farthest first, so that every insert lands at the back of the overflow.
+  for (std::int64_t i = kFarLevels - 1; i >= 0; --i) {
+    book->submit(ask(static_cast<std::uint64_t>(i) + 2, kTouch + 10'000 + (2 * i)), sink);
+  }
+  ob::Rng rng(5);
+  std::vector<NewOrder> probes;
+  for (std::uint64_t i = 0; i < 4096; ++i) {
+    const auto level = static_cast<std::int64_t>(rng.below(kFarLevels));
+    probes.push_back(ask(10'000'000 + i, kTouch + 10'000 + (2 * level) + 1));  // A free tick.
+  }
+  std::size_t next = 0;
+  bool resting = false;
+  for ([[maybe_unused]] const auto _ : state) {
+    if (resting) {
+      book->cancel(ob::CancelOrder{SymbolId{0}, probes[next].id}, sink);
+      next = (next + 1) % probes.size();
+    } else {
+      book->submit(probes[next], sink);
+    }
+    resting = !resting;
+  }
+  benchmark::DoNotOptimize(sink.events);
+  state.SetItemsProcessed(state.iterations());
 }
 
 /// Smallest non-zero step of steady_clock and the cost of reading it, so
@@ -313,6 +412,20 @@ BENCHMARK(BM_WorkloadLatency<Reference, Flow::near_touch>)
     ->Name("Latency/Reference")
     ->Iterations(3)
     ->Unit(benchmark::kMillisecond);
+BENCHMARK(BM_WindowToggle<Ladder>)
+    ->Name("WindowToggle/Ladder")
+    ->Arg(600)
+    ->Arg(1600)
+    ->Arg(3000)
+    ->Arg(5000);
+BENCHMARK(BM_WindowToggle<Map>)
+    ->Name("WindowToggle/Map")
+    ->Arg(600)
+    ->Arg(1600)
+    ->Arg(3000)
+    ->Arg(5000);
+BENCHMARK(BM_DeepOverflow<Ladder>)->Name("DeepOverflow/Ladder");
+BENCHMARK(BM_DeepOverflow<Map>)->Name("DeepOverflow/Map");
 BENCHMARK(BM_ClockResolution)->Name("ClockResolution");
 
 }  // namespace

@@ -8,9 +8,12 @@ semantics (they are part of the contract, see
 ## Requirements
 
 - CMake 3.25 or newer and Ninja
-- A C++20 compiler. CI builds with GCC 14 and Clang 18 on Ubuntu 24.04 and
-  with the default Apple Clang of the `macos-latest` runner; development
-  happened on Apple clang 21 and Homebrew LLVM 23.
+- A C++20 compiler. The library itself needs nothing beyond C++20; the
+  command-line tools also use `<format>` (libstdc++ 13 or libc++ 17 and
+  later). The CI workflow is set up for GCC 14 and Clang 18 on Ubuntu 24.04
+  and for the default Apple Clang of the `macos-latest` runner; development
+  and every local check happened on macOS with Apple clang 21 and Homebrew
+  LLVM 23.
 - Python 3.11+ for the pinned formatting and lint tools
 - For fuzzing and coverage: a Clang that ships libFuzzer and `llvm-cov`
   (Homebrew `llvm` on macOS, `clang-18` plus `libclang-rt-18-dev` on Ubuntu)
@@ -30,7 +33,7 @@ cmake --workflow --preset release  # configure, build and test the optimised bui
 
 | Preset | Purpose |
 | --- | --- |
-| `dev` | Debug build; every book re-checks all of its invariants after every request |
+| `dev` | Debug build; every book re-checks all of its invariants after every request (`OB_ENABLE_INVARIANT_CHECKS=1`, which CMake sets for the project's own targets in unoptimised builds) |
 | `release` | `-O3 -DNDEBUG`; used for benchmarks; also runs a benchmark smoke test |
 | `cxx23` | Debug build in C++23 with `OB_USE_STD_EXPECTED=ON`, so `ob::expected` is `std::expected` |
 | `asan-ubsan` | AddressSanitizer and UndefinedBehaviorSanitizer |
@@ -108,12 +111,15 @@ writes an HTML report to `build/coverage/html/index.html`.
 
 ```sh
 cmake --preset release && cmake --build --preset release
-./build/release/bench/orderbook_bench --benchmark_repetitions=5 --benchmark_report_aggregates_only=true
+./build/release/bench/orderbook_bench --benchmark_repetitions=10 \
+  --benchmark_report_aggregates_only=true --benchmark_out=build/bench.json --benchmark_out_format=json
 ```
 
 See [docs/benchmarks.md](docs/benchmarks.md) for what each benchmark measures
 and how to read the numbers. Close other heavy programs first and report the
-machine, compiler and load average with any number you quote.
+machine, compiler, load average, commit and the coefficient of variation
+(the `_cv` rows) with any number you quote; call a difference within the
+noise "no measurable difference".
 
 ## Changing the semantics
 
@@ -140,4 +146,10 @@ SHA-256 of the new archive (`curl -sL <url> | shasum -a 256`).
 
 [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`,
 `test:`, `docs:`, `build:`, `ci:` ...), one logical change per commit, and
-`ctest` green on the `dev` and `release` presets before you push.
+`ctest` green on the `dev` and `release` presets before you push. Every commit
+should configure, build and pass its tests on its own, so that `git bisect`
+works; check a branch with
+
+```sh
+git rebase -x 'cmake --preset dev >/dev/null && cmake --build --preset dev && ctest --preset dev' main
+```

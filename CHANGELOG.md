@@ -20,25 +20,33 @@ Until 1.0.0, minor versions may change the API.
   side, price, quantity and both remainders), `Cancelled` (with reason),
   `Modified` and level-2 `BookDelta`; top-of-book and depth queries.
 - `LadderLevels`: tick-indexed ring of price levels around the touch with an
-  occupancy bitmap and a sorted overflow; `MapLevels`, the `std::map`
-  baseline, behind the same `LevelIndex` concept.
+  occupancy bitmap and a sorted overflow, whose voluntary window moves are
+  delayed so that they cost amortised O(1); `MapLevels`, the `std::map`
+  baseline, behind the same `LevelIndex` concept (including `reserve`).
 - Index-addressed object pools, intrusive FIFO queues per price level and an
-  open-addressing order-id map, so that a book within its reserved capacity
-  does not allocate.
+  open-addressing order-id map, so that an `OrderBook` within its reserved
+  capacity does not allocate, wherever its price levels are.
+- A per-book seed for the order-id hash (`BookConfig::hash_seed`, random by
+  default), so that clients cannot choose colliding ids.
 - `ReferenceBook`, a deliberately simple implementation used as the oracle in
   differential tests, and `BasicEngine` for many symbols.
-- Debug-build invariant checks after every operation (`OB_ENABLE_INVARIANT_CHECKS`).
+- Invariant checks after every operation (`OB_ENABLE_INVARIANT_CHECKS`), off
+  by default and on in this project's unoptimised builds.
+- `ob::expected`, a fallback for `std::expected`; the CMake option
+  `OB_USE_STD_EXPECTED` makes it `std::expected` (C++23), recorded at build
+  time in the generated `<orderbook/config.hpp>`.
 - CSV order-stream reader and writer; deterministic text rendering of events
   and snapshots.
 - `obreplay` (replay a CSV order stream, print trades and the final book) and
-  `obgen` (synthetic, cancel-heavy, near-touch order flow).
+  `obgen` (synthetic, cancel-heavy, near-touch order flow, with
+  `workload::config_error` validating its settings).
 - Tests: typed semantic tests for all three books, randomized differential
-  tests, allocation, concurrency, golden-file CLI tests; libFuzzer targets for
-  the CSV parser and the engines; Google Benchmark suite with latency
-  percentiles.
+  tests, allocation, concurrency, golden-file and exit-status CLI tests;
+  libFuzzer targets for the CSV parser and the engines; Google Benchmark
+  suite with latency percentiles and the ladder's known worst cases.
 - CMake presets (`dev`, `release`, `cxx23`, `asan-ubsan`, `tsan`, `fuzz`,
-  `coverage`), install rules with a CMake package config, and CI on Ubuntu
-  (GCC 14, Clang 18) and macOS.
+  `coverage`), install rules with a CMake package config, and a CI workflow
+  for Ubuntu (GCC 14, Clang 18) and macOS.
 
 [Unreleased]: https://github.com/aozmekik/orderbook-cpp/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/aozmekik/orderbook-cpp/releases/tag/v0.1.0

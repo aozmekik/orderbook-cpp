@@ -34,7 +34,8 @@ options (defaults in brackets):
   --symbols=N         number of symbols, named SYM1, SYM2, ... [1]
   --seed=N            random seed; equal seeds give equal output [1]
   --start-price=N     initial reference price in ticks [100000]
-  --max-distance=N    passive orders go 0..N-1 ticks behind the touch [128]
+  --max-distance=N    passive orders go 0..N-1 ticks behind the touch,
+                      1 <= N <= 1048576 [128]
   --target-orders=N   live orders per symbol at which the cancel weight is
                       exactly --cancel; it scales with the book [2000]
   --owners=N          number of distinct owners [32]
@@ -89,6 +90,10 @@ int run(int argc, char** argv) {
     if (!option) {
       return usage_error("unexpected argument " + std::string(raw));
     }
+    const bool is_flag = option->name == "help" || option->name == "quiet";
+    if (is_flag && option->value) {
+      return usage_error("--" + std::string(option->name) + " takes no value");
+    }
     if (option->name == "help") {
       ob::cli::write(stdout, kUsage);
       return ob::cli::finish(0);
@@ -97,7 +102,11 @@ int run(int argc, char** argv) {
       quiet = true;
       continue;
     }
-    const std::string_view value = option->value.value_or("");
+    if (!option->value) {
+      return usage_error("--" + std::string(option->name) + " needs a value (--" +
+                         std::string(option->name) + "=N)");
+    }
+    const std::string_view value = *option->value;
     const auto u64 = ob::cli::parse_number<std::uint64_t>(value);
     const auto u32 = ob::cli::parse_number<std::uint32_t>(value);
     const auto i64 = ob::cli::parse_number<std::int64_t>(value);
@@ -144,8 +153,8 @@ int run(int argc, char** argv) {
       return usage_error("invalid value for --" + std::string(name));
     }
   }
-  if (config.market_percent + config.fok_percent > 100) {
-    return usage_error("--market plus --fok must not exceed 100");
+  if (const std::optional<std::string> error = ob::workload::config_error(config)) {
+    return usage_error(*error);
   }
 
   const ob::workload::Workload workload = ob::workload::generate(config);

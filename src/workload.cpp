@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <variant>
@@ -312,9 +313,39 @@ class Generator {
   std::uint64_t next_id_ = 1;
 };
 
+/// Ticks beyond `max_distance` that the generator may step from a price:
+/// one inside the spread, two through the touch, three for a reprice.
+constexpr std::int64_t kPriceMargin = 8;
+
 }  // namespace
 
+std::int64_t max_start_price(std::uint32_t max_distance) noexcept {
+  return kMaxPrice.value() - std::int64_t{max_distance} - kPriceMargin;
+}
+
+std::optional<std::string> config_error(const Config& config) {
+  if (config.max_distance == 0 || config.max_distance > kMaxDistance) {
+    return "the maximum distance must be between 1 and " + std::to_string(kMaxDistance) + " ticks";
+  }
+  const std::int64_t limit = max_start_price(config.max_distance);
+  if (config.start_price < -limit || config.start_price > limit) {
+    return "the start price must be between " + std::to_string(-limit) + " and " +
+           std::to_string(limit) + " ticks for a maximum distance of " +
+           std::to_string(config.max_distance);
+  }
+  if (config.post_only_percent > 100) {
+    return "the post-only share must be at most 100%";
+  }
+  if (std::uint64_t{config.market_percent} + config.fok_percent > 100) {
+    return "the market and fill-or-kill shares must add up to at most 100%";
+  }
+  return std::nullopt;
+}
+
 Workload generate(const Config& config) {
+  if (const std::optional<std::string> error = config_error(config)) {
+    throw std::invalid_argument("workload: " + *error);
+  }
   return Generator(config).run();
 }
 

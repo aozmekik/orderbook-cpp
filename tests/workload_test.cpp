@@ -4,6 +4,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -12,6 +14,7 @@
 
 #include <gtest/gtest.h>
 
+#include <orderbook/book_api.hpp>
 #include <orderbook/commands.hpp>
 #include <orderbook/csv.hpp>
 #include <orderbook/engine.hpp>
@@ -143,6 +146,62 @@ TEST(WorkloadTest, DefaultMixIsCancelHeavyAndNearTheTouch) {
     engine.apply(command, sink);
   }
   EXPECT_GT(near * 100, passive * 50);
+}
+
+TEST(WorkloadTest, RejectsConfigsWhosePricesWouldLeaveTheValidRange) {
+  workload::Config config;
+  EXPECT_EQ(workload::config_error(config), std::nullopt);
+  const std::int64_t limit = workload::max_start_price(config.max_distance);
+  EXPECT_LT(limit, kMaxPrice.value());
+  config.start_price = limit;
+  EXPECT_EQ(workload::config_error(config), std::nullopt);
+  config.start_price = -limit;
+  EXPECT_EQ(workload::config_error(config), std::nullopt);
+  for (const std::int64_t bad : {limit + 1, -limit - 1, std::numeric_limits<std::int64_t>::max(),
+                                 std::numeric_limits<std::int64_t>::min()}) {
+    config.start_price = bad;
+    ASSERT_TRUE(workload::config_error(config).has_value()) << bad;
+    EXPECT_THROW(static_cast<void>(workload::generate(config)), std::invalid_argument) << bad;
+  }
+}
+
+TEST(WorkloadTest, RejectsOutOfRangeShares) {
+  workload::Config config;
+  config.max_distance = 0;
+  EXPECT_TRUE(workload::config_error(config).has_value());
+  config.max_distance = workload::kMaxDistance + 1;
+  EXPECT_TRUE(workload::config_error(config).has_value());
+  config = workload::Config{};
+  config.post_only_percent = 101;
+  EXPECT_TRUE(workload::config_error(config).has_value());
+  config = workload::Config{};
+  config.market_percent = 60;
+  config.fok_percent = 41;
+  EXPECT_TRUE(workload::config_error(config).has_value());
+  config.fok_percent = 40;
+  EXPECT_EQ(workload::config_error(config), std::nullopt);
+}
+
+TEST(WorkloadTest, GeneratesAtBothEdgesOfTheAcceptedRange) {
+  // The generator's own arithmetic must not overflow (the sanitizer presets
+  // run this test under UBSan), and its first orders must be valid. Later
+  // orders may drift a few ticks past the range; books reject those.
+  for (const int sign : {1, -1}) {
+    workload::Config config;
+    config.commands = 5'000;
+    config.start_price = sign * workload::max_start_price(config.max_distance);
+    const workload::Workload w = workload::generate(config);
+    const auto* first = std::get_if<NewOrder>(&w.commands.front());
+    ASSERT_NE(first, nullptr);
+    EXPECT_TRUE(is_valid_price(first->price));
+    Engine engine;
+    engine.add_symbol(w.symbols.front());
+    NullSink sink;
+    for (const Command& command : w.commands) {
+      engine.apply(command, sink);
+    }
+    EXPECT_EQ(engine.find_book(SymbolId{0})->check_invariants(), std::nullopt);
+  }
 }
 
 TEST(DeterminismTest, ReplayingTwiceGivesIdenticalBytes) {

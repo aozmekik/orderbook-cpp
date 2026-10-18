@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -29,7 +30,8 @@ struct BookConfig {
   /// Self-trade prevention policy.
   StpPolicy stp = StpPolicy::none;
   /// Maximum number of resting orders. A new limit or post-only order that
-  /// arrives when the book is full is rejected with `book_full`.
+  /// arrives when the book is full is rejected with `book_full`. Larger
+  /// values are treated as `kMaxBookOrders`.
   std::uint32_t max_orders = kMaxBookOrders;
   /// Orders (and price levels per side) to reserve memory for up front. The
   /// book grows past this like a `std::vector`, but an `OrderBook` that never
@@ -49,6 +51,12 @@ struct BookConfig {
   /// changes the events a book emits. `ReferenceBook` ignores it.
   std::uint64_t hash_seed = 0;
 };
+
+/// `config` as a book uses it: `max_orders` clamped to `kMaxBookOrders`.
+[[nodiscard]] constexpr BookConfig normalized(BookConfig config) noexcept {
+  config.max_orders = std::min(config.max_orders, kMaxBookOrders);
+  return config;
+}
 
 /// Aggregate view of one price level.
 struct LevelView {

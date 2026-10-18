@@ -83,7 +83,7 @@ class BasicOrderBook {
  public:
   /// Creates an empty book.
   explicit BasicOrderBook(const BookConfig& config = {})
-      : config_(config),
+      : config_(normalized(config)),
         bids_(config.ladder_ticks),
         asks_(config.ladder_ticks),
         ids_(config.initial_capacity,
@@ -204,7 +204,7 @@ class BasicOrderBook {
   /// Number of price levels on `side`.
   [[nodiscard]] std::size_t level_count(Side side) const noexcept { return index_of(side).size(); }
 
-  /// The configuration the book was created with.
+  /// The configuration the book was created with, after `normalized`.
   [[nodiscard]] const BookConfig& config() const noexcept { return config_; }
 
   /// Reserves memory for `orders` resting orders, and for as many price

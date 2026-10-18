@@ -35,7 +35,7 @@ namespace ob {
 class ReferenceBook {
  public:
   /// Creates an empty book. Only `symbol`, `stp` and `max_orders` matter.
-  explicit ReferenceBook(const BookConfig& config = {}) : config_(config) {}
+  explicit ReferenceBook(const BookConfig& config = {}) : config_(normalized(config)) {}
 
   /// Processes a new order.
   template <EventSink Sink>

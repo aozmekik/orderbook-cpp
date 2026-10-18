@@ -13,6 +13,7 @@
 #include <orderbook/book_api.hpp>
 #include <orderbook/expected.hpp>
 #include <orderbook/level_index.hpp>
+#include <orderbook/order_book.hpp>
 #include <orderbook/random.hpp>
 #include <orderbook/types.hpp>
 
@@ -89,6 +90,14 @@ TEST(ValidationTest, ChecksIdThenQuantityThenPrice) {
   EXPECT_FALSE(is_valid_price(kMinPrice - Price{1}));
   EXPECT_TRUE(can_rest(OrderType::post_only));
   EXPECT_FALSE(can_rest(OrderType::ioc));
+}
+
+TEST(BookConfigTest, MaxOrdersIsClampedToWhatIndicesCanAddress) {
+  // Index 0xFFFFFFFF is the null handle, so a pool must never hand it out.
+  EXPECT_EQ(normalized(BookConfig{.max_orders = 0xFFFF'FFFFU}).max_orders, kMaxBookOrders);
+  EXPECT_EQ(normalized(BookConfig{.max_orders = 10}).max_orders, 10U);
+  const OrderBook book(BookConfig{.max_orders = 0xFFFF'FFFFU});
+  EXPECT_EQ(book.config().max_orders, kMaxBookOrders);
 }
 
 // The fallback is tested directly so that it is covered even when the

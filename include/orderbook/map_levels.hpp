@@ -25,6 +25,10 @@ class MapLevels {
   /// exists so that every level index is constructible the same way.
   explicit MapLevels(std::uint32_t /*window_ticks*/ = 0) {}
 
+  /// Does nothing: a `std::map` allocates one node per level and cannot
+  /// reserve them. This is the allocation the ladder avoids.
+  void reserve(std::size_t /*levels*/) noexcept {}
+
   /// The level stored for `key`, or `detail::kNil`.
   [[nodiscard]] detail::Index find(LevelKey key) const noexcept {
     const auto it = levels_.find(key);

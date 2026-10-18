@@ -56,9 +56,13 @@ class LadderLevels {
         headroom_(window_ / 8),
         recenter_distance_(window_ / 2),
         slots_(window_, detail::kNil),
-        bits_(window_ / 64, 0) {
-    overflow_.reserve(64);
-  }
+        bits_(window_ / 64, 0) {}
+
+  /// Makes room for `levels` levels outside the window. Levels only reach
+  /// the overflow from this index, so an index that never holds more than
+  /// `levels` levels never allocates after this call (the ring is allocated
+  /// once, by the constructor).
+  void reserve(std::size_t levels) { overflow_.reserve(levels); }
 
   /// The level stored for `key`, or `detail::kNil`.
   [[nodiscard]] detail::Index find(LevelKey key) const noexcept {
@@ -72,7 +76,7 @@ class LadderLevels {
   }
 
   /// The level stored for `key`; if there is none, stores and returns
-  /// `make()`. Allocates only if the overflow outgrows its capacity.
+  /// `make()`. Allocates only if the overflow outgrows its reserved capacity.
   template <class Make>
   detail::Index find_or_insert(LevelKey key, Make make) {
     if (ring_count_ == 0) {

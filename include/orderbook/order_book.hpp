@@ -66,8 +66,9 @@ void verify_invariants([[maybe_unused]] const Book& book) noexcept {
 ///
 /// `Levels` decides how each side finds its price levels (`LadderLevels` or
 /// `MapLevels`); everything else is shared:
-/// - orders and price levels live in index-addressed pools (`detail::Pool`),
-///   so once the pools are warm the hot path does not allocate;
+/// - orders and price levels live in index-addressed pools (`detail::Pool`)
+///   sized by `BookConfig::initial_capacity` or `reserve`, so a book that
+///   stays within that capacity does not allocate on the hot path;
 /// - each price level is an intrusive doubly linked FIFO through the orders,
 ///   so cancelling from the middle of a queue is O(1);
 /// - order ids map to orders through an open-addressing hash map.
@@ -84,8 +85,7 @@ class BasicOrderBook {
         bids_(config.ladder_ticks),
         asks_(config.ladder_ticks),
         ids_(config.initial_capacity) {
-    orders_.reserve(config.initial_capacity);
-    levels_.reserve(config.initial_capacity);
+    reserve(config.initial_capacity);
   }
 
   /// Processes a new order: validation, matching, then resting or cancelling
@@ -200,12 +200,16 @@ class BasicOrderBook {
   /// The configuration the book was created with.
   [[nodiscard]] const BookConfig& config() const noexcept { return config_; }
 
-  /// Reserves memory for `orders` resting orders (and as many price levels),
-  /// so that the book does not allocate until it holds more than that.
+  /// Reserves memory for `orders` resting orders, and for as many price
+  /// levels on each side, so that the book does not allocate until it holds
+  /// more than `orders` orders (`MapOrderBook` still allocates a tree node
+  /// per new price level).
   void reserve(std::size_t orders) {
     orders_.reserve(orders);
     levels_.reserve(orders);
     ids_.reserve(orders);
+    bids_.reserve(orders);
+    asks_.reserve(orders);
   }
 
   /// Checks every invariant of the book; returns a description of the first

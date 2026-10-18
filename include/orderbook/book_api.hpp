@@ -31,9 +31,11 @@ struct BookConfig {
   /// Maximum number of resting orders. A new limit or post-only order that
   /// arrives when the book is full is rejected with `book_full`.
   std::uint32_t max_orders = kMaxBookOrders;
-  /// Orders (and price levels) to reserve memory for up front. The book grows
-  /// past this like a `std::vector`, but a book that never exceeds it never
-  /// allocates after construction.
+  /// Orders (and price levels per side) to reserve memory for up front. The
+  /// book grows past this like a `std::vector`, but an `OrderBook` that never
+  /// holds more orders than this never allocates after construction, wherever
+  /// its price levels are. (`MapOrderBook` still allocates a tree node per new
+  /// price level, and `ReferenceBook` ignores the setting.)
   std::uint32_t initial_capacity = 1024;
   /// Width in ticks of the dense window `LadderLevels` keeps around the best
   /// price. Rounded up to a power of two, minimum 64. Ignored by other level

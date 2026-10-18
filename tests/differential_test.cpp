@@ -39,9 +39,11 @@ namespace ob {
 namespace {
 
 // Debug builds re-check every invariant inside each book after every
-// request, which costs O(book size); they run a fifth of the requests.
+// request, which costs O(book size), so they run fewer requests: over the 24
+// configurations, 2.4 million requests in debug builds and 6 million in
+// release builds.
 constexpr bool kBooksSelfCheck = OB_ENABLE_INVARIANT_CHECKS != 0;
-constexpr std::uint64_t kDefaultOperations = kBooksSelfCheck ? 25'000 : 250'000;
+constexpr std::uint64_t kDefaultOperations = kBooksSelfCheck ? 100'000 : 250'000;
 
 std::uint64_t operations_per_run() {
   if (const char* value = std::getenv("OB_DIFF_OPS")) {  // NOLINT(concurrency-mt-unsafe)
